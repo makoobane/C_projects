@@ -1,5 +1,5 @@
 si aad u run garayso valgrind sidan dheh 
 gcc -g -O0 file.c -o valg_file
  kadibna
-valgrind --leak-checks=full --show-leak-kinds=all --track-origins=yes -s ./valg_file 
+valgrind --leak-check=full --show-leak-kinds=all --track-origins=yes -s ./valg_file 
 waxa markaa laguu soo ururin errors

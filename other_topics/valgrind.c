@@ -3,7 +3,7 @@
 
 int main(){
     int* ten=calloc(10,sizeof(int));
-    ten[10]=13;
+    ten[9]=13;
     free(ten);
     ten=NULL;
     return 0;
