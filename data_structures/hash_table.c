@@ -1,26 +1,29 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#define TABLE_SIZE 16
 typedef struct HashMap{
-    struct Entry* bucket[TABLE_SIZE];
+    struct Entry** bucket;
+    int capacity;
+    int count;
 }HashMap;
 typedef struct Entry{
 char* key;
 char* value;
 struct Entry* next;
 }Entry;
-unsigned long hash(const char* key);
-HashMap* createHashMap();
+unsigned long hash(const char* key,int capacity);
+HashMap* createHashMap(int capacity);
 Entry* makeNewEntry( const char* key, const char* value);
 void set(HashMap* map,const  char* key,const  char* value);
 char* get(HashMap* map, const char* key);
 void printAll(HashMap* map);
 void removeKey(HashMap* map,const char* key);
+void migrate(Entry* entry,Entry** newBucket,int newCapacity);
+void resize(HashMap* map,int newCapacity);
 void dealocate(HashMap* map);
 int main(){
 
-    HashMap* hashmap=createHashMap();
+    HashMap* hashmap=createHashMap(4);
     if(hashmap!=NULL){
         
         set(hashmap,"first","first something");
@@ -38,14 +41,14 @@ int main(){
 
         dealocate(hashmap);
     }else{
-        printf("it failed to create %d hashmap",TABLE_SIZE);
+        puts("it failed to create that hashmap");
         exit(1);
     }
 
     return 0;
 }
 
-unsigned long  hash(const  char* key){
+unsigned long  hash(const  char* key,int capacity){
     
     unsigned long  value=5381;
     int i=0;
@@ -54,20 +57,25 @@ unsigned long  hash(const  char* key){
        value=((value<<5)+value)+key[i];
        i+=1;
     }
-    return value%TABLE_SIZE;
+    return value%capacity;
     
 }
 
 
 
-HashMap *createHashMap()
+HashMap *createHashMap(int capacity)
 {
     HashMap* map=malloc(sizeof(HashMap));
     if(map!=NULL){
-        for(int k=0;k<TABLE_SIZE;k++){
-            map->bucket[k]=NULL;
-        }
+        map->bucket=calloc(capacity,sizeof(Entry*));
+       if(map->bucket!=NULL){
+         map->capacity=capacity;
+        map->count=0;
         return map;
+       }else{
+        perror("it failed to allocate bucket");
+        return NULL;
+       }
     }
     return NULL;
 }
@@ -90,7 +98,7 @@ Entry* makeNewEntry(const char* key, const char* value){
 
 void set(HashMap *map, const char *key, const char *value)//this one is  from claude
 {
-    unsigned long index = hash(key);
+    unsigned long index = hash(key,map->capacity);
     Entry* current = map->bucket[index];
 
     // search the whole chain for an existing match
@@ -114,16 +122,26 @@ void set(HashMap *map, const char *key, const char *value)//this one is  from cl
         return;
     }
     if (current == NULL) {
-        map->bucket[index] = new_entry;      
+        map->bucket[index] = new_entry; 
+        map->count+=1;  
+      if((float)(map->count + 1) / map->capacity > 0.7){
+            int newSize=2*map->capacity;
+            resize(map,newSize);
+        }
     } else {
         current->next = new_entry;           
         printf("\"%s\" key is branched to \"%s\" key\n", new_entry->key, map->bucket[index]->key);
+        map->count+=1;
+       if((float)(map->count + 1) / map->capacity > 0.7){
+            int newSize=2*map->capacity;
+            resize(map,newSize);
+        }
     }
 }
 
 char *get(HashMap *map, const char *key)
 {
-    unsigned long index=hash(key);
+    unsigned long index=hash(key,map->capacity);
     Entry* entry= map->bucket[index];
     
         while (entry!=NULL)
@@ -139,7 +157,7 @@ char *get(HashMap *map, const char *key)
 void printAll(HashMap *map)
 {
   puts("----------------HashMap Data-------------");
-  for(int i=0;i<TABLE_SIZE;i++){
+  for(int i=0;i<map->capacity;i++){
     if(map->bucket[i]!=NULL){
         Entry* present=map->bucket[i];
             while (present!=NULL)
@@ -153,54 +171,10 @@ void printAll(HashMap *map)
   
     
 }
-// void removeKey(HashMap *map,const char *key)
-// {
-//     unsigned long index=hash(key);
-//     Entry* entry=map->bucket[index];
-//     if(strcmp(entry->key,key)==0){
-//         // we found it in the top
-//         if(entry->next==NULL){
-//             free(entry->key);
-//             free(entry->value);
-//             free(entry);
-//             map->bucket[index]=NULL;
-//         }else{
-//             //it is mother of chain
-//             Entry* next=entry->next;
-//             free(entry->key);
-//             free(entry->value);
-//             free(entry);
-//             map->bucket[index]=next;
 
-//         }
-//         printf("\"%s \" was deleted from top\n",key);
-//     }else{
-//         // it is in deep
-//         if(entry->next==NULL){
-//             perror("fetching error occured: why not top and no next??"); return;
-//         }
-//         Entry* top=entry;
-//         entry=entry->next;
-//         while(entry!=NULL){
-//             if(strcmp(entry->key,key)==0){
-//                 // we found it inside
-//                 free(entry->key);
-//                 free(entry->value);
-//                 top->next=entry->next;
-//                 free(entry);
-//                 printf("\"%s \" was deleted from inside\n",key);
-//                 break;
-//             }
-//             top=entry;
-//             entry=entry->next;
-//         }
-
-
-//     }
-// }
 void removeKey(HashMap *map, const char *key)
 {
-    unsigned long index = hash(key);
+    unsigned long index = hash(key,map->capacity);
     Entry* entry = map->bucket[index];
 
     if (entry == NULL) {
@@ -214,6 +188,12 @@ void removeKey(HashMap *map, const char *key)
         free(entry->value);
         free(entry);
         printf("\"%s\" was deleted from top\n", key);
+        map->count-=1;
+        if((float)(map->count) / map->capacity<0.3){
+            int newSize= map->capacity /2;
+            if (newSize < 4) return;   // pick some sensible floor, don't shrink below it
+            resize(map,newSize);
+        }
         return;
     }
 
@@ -226,6 +206,12 @@ void removeKey(HashMap *map, const char *key)
             free(entry->value);
             free(entry);
             printf("\"%s\" was deleted from inside\n", key);
+            map->count-=1;
+            if((float)(map->count) / map->capacity<0.3){
+            int newSize= map->capacity /2;
+            if (newSize < 4) return;   // pick some sensible floor, don't shrink below it
+            resize(map,newSize);
+        }
             return;
         }
         top = entry;
@@ -233,9 +219,41 @@ void removeKey(HashMap *map, const char *key)
     }
     printf("\"%s\" not found in this chain\n", key);   // bug 2, see below
 }
+void resize(HashMap *map, int newCapacity)
+{
+    Entry** newBucket = calloc(newCapacity, sizeof(Entry*));
+    if (newBucket == NULL) { perror("resize failed"); exit(1); }
+
+    for (int i = 0; i < map->capacity; i++) {
+        Entry* entry = map->bucket[i];
+        while (entry != NULL) {
+            Entry* next = entry->next;   // save BEFORE migrate mutates entry->next
+            migrate(entry, newBucket, newCapacity);
+            entry = next;
+        }
+    }
+    free(map->bucket);
+    map->bucket = newBucket;
+    map->capacity = newCapacity;
+    printf("it was resized\n");
+}
+void migrate(Entry* entry, Entry** newBucket, int newCapacity){
+    entry->next = NULL;   // detach from the old chain before relinking
+    unsigned long newIndex = hash(entry->key, newCapacity);
+    Entry* head = newBucket[newIndex];
+    if (head == NULL) {
+        newBucket[newIndex] = entry;
+    } else {
+        Entry* last = head;
+        while (last->next != NULL) {
+            last = last->next;
+        }
+        last->next = entry;
+    }
+}
 void dealocate(HashMap *map)
 {
-    for(int j=0;j<TABLE_SIZE;j++){
+    for(int j=0;j<map->capacity;j++){
      Entry* e=map->bucket[j];
         while(e!=NULL){
             Entry* next=e->next;
@@ -245,5 +263,6 @@ void dealocate(HashMap *map)
             e=next;
      }
     }
+    free(map->bucket);
     free(map);
 }
