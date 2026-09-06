@@ -31,14 +31,21 @@ int main(){
         set(hashmap,"second","duplicate something");
         set(hashmap,"third","third item");
         set(hashmap,"fourth","fourth item");
+        printf("\'%s\' is stored in third \n",get(hashmap,"five"));
         set(hashmap,"fifth","fifth item");
-        set(hashmap,"sixth","sixth item");
+        set(hashmap,"sixth","6 item");
+        set(hashmap,"seventh","7 item");
+        set(hashmap,"eight","8 item");
+        set(hashmap,"ninth","9 item");
         printf("\'%s\' is stored in third \n",get(hashmap,"third"));
         printAll(hashmap);
         removeKey(hashmap,"fourth");
         removeKey(hashmap,"second");
+        removeKey(hashmap,"seventh");
+        removeKey(hashmap,"seventh");// try if it is still there
+        removeKey(hashmap,"eight");
+        removeKey(hashmap,"ninth");
         printAll(hashmap);
-
         dealocate(hashmap);
     }else{
         puts("it failed to create that hashmap");
@@ -151,6 +158,7 @@ char *get(HashMap *map, const char *key)
             }
             entry=entry->next;
         }
+    printf("\" %s\" this key is not present now in this map",key);
     return NULL;
 }
 
@@ -237,7 +245,9 @@ void resize(HashMap *map, int newCapacity)
     map->capacity = newCapacity;
     printf("it was resized\n");
 }
-void migrate(Entry* entry, Entry** newBucket, int newCapacity){
+
+void migrate(Entry *entry, Entry **newBucket, int newCapacity)
+{
     entry->next = NULL;   // detach from the old chain before relinking
     unsigned long newIndex = hash(entry->key, newCapacity);
     Entry* head = newBucket[newIndex];
