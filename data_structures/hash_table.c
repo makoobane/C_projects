@@ -4,7 +4,6 @@
 #define TABLE_SIZE 16
 typedef struct HashMap{
     struct Entry* bucket[TABLE_SIZE];
-    struct Entry* top;
 }HashMap;
 typedef struct Entry{
 char* key;
@@ -13,6 +12,7 @@ struct Entry* next;
 }Entry;
 unsigned long hash(const char* key);
 HashMap* createHashMap();
+Entry* makeNewEntry( const char* key, const char* value);
 void set(HashMap* map,const  char* key,const  char* value);
 char* get(HashMap* map, const char* key);
 void printAll(HashMap* map);
@@ -27,10 +27,13 @@ int main(){
         set(hashmap,"second","second something");
         set(hashmap,"second","duplicate something");
         set(hashmap,"third","third item");
+        set(hashmap,"fourth","fourth item");
+        set(hashmap,"fifth","fifth item");
+        set(hashmap,"sixth","sixth item");
         printf("\'%s\' is stored in third \n",get(hashmap,"third"));
-        removeKey(hashmap,"seconds");//to fail
+        printAll(hashmap);
+        removeKey(hashmap,"fourth");
         removeKey(hashmap,"second");
-
         printAll(hashmap);
 
         dealocate(hashmap);
@@ -64,18 +67,12 @@ HashMap *createHashMap()
         for(int k=0;k<TABLE_SIZE;k++){
             map->bucket[k]=NULL;
         }
-        map->top=NULL;
         return map;
     }
     return NULL;
 }
-
-void set(HashMap *map,const  char *key,const  char *value)
-{   
-
-    unsigned long indexAfterHashing=hash(key);
-    if(map->bucket[indexAfterHashing]==NULL){
-        //enter this item
+Entry* makeNewEntry(const char* key, const char* value){
+         //enter this item
         Entry* entry=malloc(sizeof(Entry));
         if(entry!=NULL){
             char* keyp=malloc(strlen(key)+1);
@@ -85,33 +82,42 @@ void set(HashMap *map,const  char *key,const  char *value)
             entry->key=keyp;
             entry->value=valuep;
             entry->next=NULL;
-            map->bucket[indexAfterHashing]=entry;
-            if(map->top==NULL){
-                map->top=entry;
-            }else{
-                entry->next=map->top;
-                map->top=entry;
-            }
-            puts("it added new item succesfully");
+            return entry;
         }else{
-            perror("it failed to allocate entery");
-            exit(1);
+            return NULL;
         }
-    }else{
-        //this key is registerd already eventhoug jdb2 hash have collisions around 1 in every 77k distinct items
-        Entry* existedEntry=map->bucket[indexAfterHashing];
-        //check if they are really duplicates
-        if(strcmp(existedEntry->key,key)==0){
-            //this is updating
-            free(existedEntry->value);
-            char* valuep=malloc(strlen(value)+1);
-            strcpy(valuep,value);
-            existedEntry->value=valuep;
-            printf("it updated \"%s\" key value\n",existedEntry->key);
-        }else{
-            //the problem is hashing so
-            perror("it has collision in hash jdb2");
+    }
+
+void set(HashMap *map, const char *key, const char *value)//this one is  from claude
+{
+    unsigned long index = hash(key);
+    Entry* current = map->bucket[index];
+
+    // search the whole chain for an existing match
+    while (current != NULL) {
+        if (strcmp(current->key, key) == 0) {
+            free(current->value);
+            char* valuep = malloc(strlen(value) + 1);
+            strcpy(valuep, value);
+            current->value = valuep;
+            printf("it updated \"%s\" key value\n", current->key);
+            return;
         }
+        if (current->next == NULL) break;   // stop at the tail
+        current = current->next;
+    }
+
+    // no match found — append (or set as head, if bucket was empty)
+    Entry* new_entry = makeNewEntry(key, value);
+    if (new_entry == NULL) {
+        perror("it failed to allocate new entry in set");
+        return;
+    }
+    if (current == NULL) {
+        map->bucket[index] = new_entry;      
+    } else {
+        current->next = new_entry;           
+        printf("\"%s\" key is branched to \"%s\" key\n", new_entry->key, map->bucket[index]->key);
     }
 }
 
@@ -119,58 +125,124 @@ char *get(HashMap *map, const char *key)
 {
     unsigned long index=hash(key);
     Entry* entry= map->bucket[index];
-    if(entry!=NULL){
-        return entry->value;
-    }
+    
+        while (entry!=NULL)
+        {
+            if(strcmp(entry->key,key)==0){
+                return entry->value;
+            }
+            entry=entry->next;
+        }
     return NULL;
 }
 
 void printAll(HashMap *map)
 {
-  Entry* current=map->top;
-  //it is stack form it reads newest first and first one will be last
   puts("----------------HashMap Data-------------");
-  while (current!=NULL)
-  {
-      printf("%s :%s \n",current->key,current->value);
-      current=current->next;
+  for(int i=0;i<TABLE_SIZE;i++){
+    if(map->bucket[i]!=NULL){
+        Entry* present=map->bucket[i];
+            while (present!=NULL)
+            {
+                printf("%s : %s \n", present->key,present->value);
+                present=present->next;
+            }
     }
+  }
   puts("----------------End-------------");
   
     
 }
+// void removeKey(HashMap *map,const char *key)
+// {
+//     unsigned long index=hash(key);
+//     Entry* entry=map->bucket[index];
+//     if(strcmp(entry->key,key)==0){
+//         // we found it in the top
+//         if(entry->next==NULL){
+//             free(entry->key);
+//             free(entry->value);
+//             free(entry);
+//             map->bucket[index]=NULL;
+//         }else{
+//             //it is mother of chain
+//             Entry* next=entry->next;
+//             free(entry->key);
+//             free(entry->value);
+//             free(entry);
+//             map->bucket[index]=next;
+
+//         }
+//         printf("\"%s \" was deleted from top\n",key);
+//     }else{
+//         // it is in deep
+//         if(entry->next==NULL){
+//             perror("fetching error occured: why not top and no next??"); return;
+//         }
+//         Entry* top=entry;
+//         entry=entry->next;
+//         while(entry!=NULL){
+//             if(strcmp(entry->key,key)==0){
+//                 // we found it inside
+//                 free(entry->key);
+//                 free(entry->value);
+//                 top->next=entry->next;
+//                 free(entry);
+//                 printf("\"%s \" was deleted from inside\n",key);
+//                 break;
+//             }
+//             top=entry;
+//             entry=entry->next;
+//         }
+
+
+//     }
+// }
 void removeKey(HashMap *map, const char *key)
 {
     unsigned long index = hash(key);
-    Entry* rmEntry = map->bucket[index];
+    Entry* entry = map->bucket[index];
 
-    if (rmEntry == NULL || strcmp(rmEntry->key, key) != 0) {
-        printf("invalid key \"%s\": this key is not present in this map\n", key);
+    if (entry == NULL) {
+        printf("\"%s\" not found: bucket is empty\n", key);
         return;
     }
 
-    Entry** indirect = &map->top;          
-    while (*indirect != rmEntry) {
-        indirect = &(*indirect)->next;     
+    if (strcmp(entry->key, key) == 0) {
+        map->bucket[index] = entry->next;   // works whether next is NULL or not — no need to branch on it
+        free(entry->key);
+        free(entry->value);
+        free(entry);
+        printf("\"%s\" was deleted from top\n", key);
+        return;
     }
-    *indirect = rmEntry->next;             
 
-    printf("\"%s\" : \"%s\" (is deleted)\n", rmEntry->key, rmEntry->value);
-    free(rmEntry->key);
-    free(rmEntry->value);
-    free(rmEntry);
-    map->bucket[index] = NULL;
+    Entry* top = entry;
+    entry = entry->next;
+    while (entry != NULL) {
+        if (strcmp(entry->key, key) == 0) {
+            top->next = entry->next;
+            free(entry->key);
+            free(entry->value);
+            free(entry);
+            printf("\"%s\" was deleted from inside\n", key);
+            return;
+        }
+        top = entry;
+        entry = entry->next;
+    }
+    printf("\"%s\" not found in this chain\n", key);   // bug 2, see below
 }
-
 void dealocate(HashMap *map)
 {
     for(int j=0;j<TABLE_SIZE;j++){
      Entry* e=map->bucket[j];
-     if(e!=NULL){
-        free(e->key);
-        free(e->value);
-        free(e);
-        e=NULL;
+        while(e!=NULL){
+            Entry* next=e->next;
+            free(e->key);
+            free(e->value);
+            free(e);
+            e=next;
      }
     }
     free(map);

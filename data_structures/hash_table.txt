@@ -1,0 +1,83 @@
+}
+// void set(HashMap *map,const  char *key,const  char *value)
+// {   
+
+//     unsigned long indexAfterHashing=hash(key);
+//     if(map->bucket[indexAfterHashing]==NULL){
+//           Entry* new_entry=makeNewEntry(key,value);
+//           if(new_entry!=NULL){
+//             map->bucket[indexAfterHashing]=new_entry;
+//           }else{
+//             perror("it failed to allocatte new entry in set");
+//           }
+//     }else{
+//         //this key is registerd already eventhoug jdb2 hash have collisions around 1 in every 77k distinct items
+//         Entry* existedEntry=map->bucket[indexAfterHashing];
+//         //check if they are really duplicates
+//         if(strcmp(existedEntry->key,key)==0){
+//             //this is updating
+//             free(existedEntry->value);
+//             char* valuep=malloc(strlen(value)+1);
+//             strcpy(valuep,value);
+//             existedEntry->value=valuep;
+//             printf("it updated \"%s\" key value\n",existedEntry->key);
+//         }else{
+//             // before I search what solution was used to fix hash_map collisions .. my approach is shifting index to which
+//             //side it is close to if index is in lower half then shift it to reach empty space in left if not found go other side
+//             // i think it is panning through bucket... also get will be same may be O(0.5n) in avg; 
+        
+//             // if(indexAfterHashing>=TABLE_SIZE/2){
+//             //     int goOtherHalf=1;
+//             //     //top half first
+//             //     for(int t=indexAfterHashing+1;t<TABLE_SIZE;t++){
+//             //         if(map->bucket[t]==NULL){
+//             //             goOtherHalf=0;
+//             //             addNew(map,key,value,t);
+//             //             break;
+//             //         }
+//             //     }
+//             //     if(goOtherHalf){
+//             //         for(int t=indexAfterHashing-1;t>-1;t--){
+//             //             if(map->bucket[t]==NULL){
+//             //                 addNew(map,key,value,t);
+//             //                 break;
+//             //             }
+//             //         }
+//             //     }
+//             // }else{
+//             //     //lower half first
+//             //     int goToOtherHalf=1;
+//             //     for(int t=indexAfterHashing-1;t>-1;t--){
+//             //             if(map->bucket[t]==NULL){
+//             //                 goToOtherHalf=0;
+//             //                 addNew(map,key,value,t);
+//             //                 break;
+//             //             }
+//             //         }
+//             //     if(goToOtherHalf){
+//             //           for(int t=indexAfterHashing+1;t<TABLE_SIZE;t++){
+//             //         if(map->bucket[t]==NULL){
+//             //             addNew(map,key,value,t);
+//             //             break;
+//             //         }
+//             //     }
+//             //     }
+
+//             // }
+//             // //After I searched it from gemini  this is called openaddressing approach ... yey it exists
+//             // but it has bad shape of conditions. but there is another approach called 
+//             // //separate chaining . it is separate linkedlists .... now next makes sense
+//             // I though i need next in entry bcs to print them like stack or in queue without needing to iterate the bucket 
+            
+//             char* motherkey=existedEntry->key;
+//             Entry* new_entry=makeNewEntry(key,value);
+           
+//             while(existedEntry->next!=NULL){   
+//                 existedEntry=existedEntry->next;
+//             }
+//                  // he reached last entry with next of null
+//             existedEntry->next=new_entry;
+//             printf("\"%s \" key is branched to \" %s\" key \n",new_entry->key,motherkey);
+//         }
+//     }
+// }
