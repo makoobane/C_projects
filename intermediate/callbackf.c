@@ -7,7 +7,7 @@ struct Array
   int length;
 };
 
-void forEach(void (*func)(int,int , int ),struct Array* array);
+void forEach(void (*func)(const int,const int ,const  int ),struct Array* array);
 
 void print(int element, int index,int length);
 

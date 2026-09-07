@@ -20,6 +20,9 @@ void printAll(HashMap* map);
 void removeKey(HashMap* map,const char* key);
 void migrate(Entry* entry,Entry** newBucket,int newCapacity);
 void resize(HashMap* map,int newCapacity);
+void forEach(HashMap* map,void (*func)(Entry*));
+int contains(HashMap* map,const char* key);
+void clear(HashMap* map);
 void dealocate(HashMap* map);
 int main(){
 
@@ -39,12 +42,15 @@ int main(){
         set(hashmap,"ninth","9 item");
         printf("\'%s\' is stored in third \n",get(hashmap,"third"));
         printAll(hashmap);
+        printf("does that is present: %d\n",contains(hashmap,"eight"));
         removeKey(hashmap,"fourth");
         removeKey(hashmap,"second");
         removeKey(hashmap,"seventh");
         removeKey(hashmap,"seventh");// try if it is still there
         removeKey(hashmap,"eight");
         removeKey(hashmap,"ninth");
+        printAll(hashmap);
+        clear(hashmap);
         printAll(hashmap);
         dealocate(hashmap);
     }else{
@@ -244,6 +250,53 @@ void resize(HashMap *map, int newCapacity)
     map->bucket = newBucket;
     map->capacity = newCapacity;
     printf("it was resized\n");
+}
+
+void forEach(HashMap *map, void (*func)(Entry *))
+{
+  for(int i=0;i<map->capacity;i++){
+    if(map->bucket[i]!=NULL){
+        Entry* entry=map->bucket[i];
+            while (entry!=NULL)
+            {
+                func(entry);
+                entry=entry->next;
+            }
+    }
+  }
+}
+
+int contains(HashMap *map, const char *key)
+{
+    unsigned long index=hash(key,map->capacity);
+    Entry* entry= map->bucket[index];
+    
+        while (entry!=NULL)
+        {
+            if(strcmp(entry->key,key)==0){
+                return 1;
+            }
+            entry=entry->next;
+        }
+    return 0;
+}
+
+void clear(HashMap *map)
+{
+for(int j=0;j<map->capacity;j++){
+     Entry* e=map->bucket[j];
+        while(e!=NULL){
+            Entry* next=e->next;
+            free(e->key);
+            free(e->value);
+            free(e);
+            e=next;
+     }
+     map->bucket[j]=NULL;
+    }
+map->count=0;
+resize(map,4);
+ puts("it was cleaared");
 }
 
 void migrate(Entry *entry, Entry **newBucket, int newCapacity)
