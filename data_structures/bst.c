@@ -9,16 +9,16 @@ typedef struct BST
 {
     int count;
     struct  Node* parent;
-    struct Node** helper;
 }BST;
 BST* createBSTWithParentDataOf(int data);
 void append(BST* tree,int data);
-void freeing(BST* tree);
+void deallocate(BST* tree);
+void freeing(Node* root);
 int main(){
     BST* tree=createBSTWithParentDataOf(10);
     if(tree!=NULL){
       append(tree,12);
-      freeing(tree);
+      deallocate(tree);
     }
 
     return 0;
@@ -33,27 +33,17 @@ BST *createBSTWithParentDataOf(int data)
        parent->data=data;
        parent->left=NULL;
        parent->right=NULL;
-       tree->helper=(Node**)calloc(1,sizeof(Node*));
-       if(tree->helper!=NULL){
-           tree->helper[0]=parent;
-           tree->count=1;
-           tree->parent=parent;
-           return tree;
+       tree->parent=parent;
+       tree->count=1;
+       return tree; 
        }else{
-        //eventhough it may work but freeing will be difficult so
-        perror("it failed to allocate garbage collector like");
-        free(parent);
+        printf("it failed to allocate parent");
         free(tree);
         return NULL;
        }
-    }else{
-        perror("it failed to allocate the parent");
-        free(tree);
-        
-        return NULL;
-    }
     }
     return NULL;
+    
 }
 
 void append(BST *tree, int data)
@@ -92,35 +82,64 @@ void append(BST *tree, int data)
     }
     
 }
-Node** resizedHelper=(Node**) realloc(tree->helper,(tree->count+1 )*sizeof(Node*));
-if(resizedHelper!=NULL){
-    resizedHelper[tree->count]=new_Node;
-    tree->count+=1;
-    tree->helper=resizedHelper;
-    puts("successfully added");
-   }else{
-      printf("it failed to reallocatte freeer at append of %d\n",data);
-      if(current->left==new_Node) current->left=NULL;
-      if(current->right==new_Node) current->right=NULL;
-      free(new_Node);
-   }
-   
+tree->count+=1;
+puts("it appended successfully");   
 }else{
     perror("it failed to allocate that inserted node");
     exit(1);
 }
 }
 
-void freeing(BST *tree)
+void freeing(Node* root)
 {
-    for(int i=0;i<tree->count;i++){
-        Node* node=tree->helper[i];
-        if(node!=NULL){
+    int capacity=16;
+    int top=0;
+    Node** stack=(Node**)calloc(capacity,sizeof(Node*));
+    if(stack==NULL){
+        perror("it failed freeing bcs it is not allocating stack for freeing");
+        exit(1);
+
+    }else{
+        stack[top]=root;
+        top+=1;
+        while(top>0){
+            top-=1;
+            Node* node=stack[top];
+            if(node->left!=NULL){
+                if(top==capacity){
+                   capacity*=2;
+                   Node** resizedStack=realloc(stack,capacity*sizeof(Node*));
+                   if(resizedStack==NULL){
+                       perror("failed to reallocate freeing stack");
+                       free(stack);
+                       return;
+                   }
+                   stack=resizedStack;
+                 }
+             stack[top]=node->left;
+             top+=1;
+            }
+            if(node->right!=NULL){
+               if(top==capacity){
+                   capacity*=2;
+                   Node** resizedStack=realloc(stack,capacity*sizeof(Node*));
+                   if(resizedStack==NULL){
+                       perror("failed to reallocate freeing stack");
+                       free(stack);
+                       return;
+                   }
+                   stack=resizedStack;
+                 }
+             stack[top]=node->right;
+             top+=1;
+            }
             free(node);
-        }else{
-            puts("wo this was not supposed ");
         }
+        free(stack);
     }
-    free(tree->helper);
-    free(tree);
+}
+
+void deallocate(BST* tree){
+ freeing(tree->parent);
+ free(tree);
 }
