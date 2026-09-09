@@ -14,10 +14,14 @@ BST* createBSTWithParentDataOf(int data);
 void append(BST* tree,int data);
 int contains(BST* tree, int data);
 Node* find(BST* tree, int data);
-Node* findParentOf(BST* tree, int data);
+Node* findParentOf(BST* tree, Node* node);
 Node* findMax(BST* tree);
 Node* findMin(BST* tree);
-void remove(BST* tree, int data);
+int countNodes(Node* node);
+int countLeft(BST* tree);
+int countRight(BST* tree);
+BST* makeSubTree(Node* subparent);
+void removeNode(BST* tree, int data);
 void deallocate(BST* tree);
 void freeing(Node* root);
 int main(){
@@ -145,24 +149,28 @@ Node *find(BST *tree, int data)
     return NULL;
 }
 
-Node *findParentOf(BST *tree, int data)
+Node *findParentOf(BST *tree,Node* node)
 {
-    Node* parent=NULL;
+  Node* parent=tree->parent;
+  if(parent==node){
+    //it is main parent so it is parentless
+    return NULL;
+  }else{
     Node* current=tree->parent;
     while (current!=NULL)
     {
-        if(current->data==data){
-          return current;
-       }else if(data>current->data){
-        //keep this as parent before you go down
-        parent=current;
-        current=current->right;
-       }else{
-        parent=current;
-        current=current->left;
-       }
+        if(current==node&& current->data==node->data){
+            return parent;
+        }else if(node->data>current->data){
+            parent=current;
+            current=current->right;
+        }else{
+            parent=current;
+            current=current->left;
+        }
     }
     return parent;
+  }
 }
 
 Node *findMax(BST *tree)
@@ -185,12 +193,42 @@ Node *findMin(BST *tree)
     }
     return current;
 }
+//count total
+int countNodes(Node* node)
+{
+    if(node == NULL) return 0;
+    return 1 + countNodes(node->left) + countNodes(node->right);
+}
+//count left side
+int countLeft(BST* tree)
+{
+    return countNodes(tree->parent->left);
+}
+//count right side
+int countRight(BST* tree)
+{
+    return countNodes(tree->parent->right);
+}
+//make tree that starts from this node
+BST *makeSubTree(Node *subparent)
+{
+    BST* subtree=malloc(sizeof(BST));
+    if(subtree!=NULL){
+       int count=countNodes(subparent);
+       subtree->count=count;
+       subtree->parent=subparent;
+       return subtree;
+    }else{
+        return NULL;
+    }
+}
 
-void remove(BST *tree, int data)
+// remove that node
+void removeNode(BST *tree, int data)
 {
     Node* node=find(tree,data);
     if(node!=NULL){
-      Node* parent=findParentOf(tree,data);
+      Node* parent=findParentOf(tree,node);
       if(parent==NULL){
         // node is main parent then don't remove it 
         printf("you cant remove main parent of the tree ... atleast for now\n");
@@ -203,19 +241,22 @@ void remove(BST *tree, int data)
         if(parent->right==node) parent->right=NULL;
         free(node);
       }
-      //state two: it has one child, move that child its position
-      if(node->left!=NULL||node->right!=NULL &&!(node->left!=NULL&&node->right!=NULL)){
-        Node* child=node->left==NULL?node->right:node->left;
-        if(parent->left==node) parent->left=child;
-        if(parent->right==node)parent->right=child;
-        free(node);
+      if(node->left!=NULL||node->right!=NULL){//-----------either or both
+          //state three: it has ttwo children,
+          if(node->left!=NULL&&node->right!=NULL){//------------both
+              //--todo remove that node and replace what deserves its position?
+              
+        }else{//_----either
+          //state two: it has one child, move that child its position
+           Node* child=node->left==NULL?node->right:node->left;
+           if(parent->left==node) parent->left=child;
+           if(parent->right==node)parent->right=child;
+            free(node);
+          }   
       }
-      //state three: it has ttwo children,
-
-
+      tree->count-=1;
     }else{
-     //link this string below what msg that find gave us
-     printf("------:so you cant remove what you dont have"\n);
+     printf("------:so you cant remove what you dont have\n");
      return;
     }
 }
