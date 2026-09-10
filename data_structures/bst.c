@@ -42,6 +42,13 @@ int main(){
       Node* n=find(tree,-20);
       if(n!=NULL) printf("found?%d\n",n->data);
       printf("min in this tree is : %d, where max is : %d\n",findMin(tree)->data,findMax(tree)->data);
+      printf("assert counts %d vs %d\n",tree->count,countNodes(tree->parent));
+      Node* left=find(tree,0)->left;
+      Node* right=find(tree,0)->right;
+      printf("%d,%d\n",left==NULL,right==NULL);
+      removeNode(tree,0);
+      removeNode(tree,10);//removing parent must fail
+      printf("assert counts %d vs %d\n",tree->count,countNodes(tree->parent));
       deallocate(tree);
     }
 
@@ -223,44 +230,133 @@ BST *makeSubTree(Node *subparent)
     }
 }
 
-// remove that node
+// // remove that node
+// void removeNode(BST *tree, int data)
+// {
+//     Node* node=find(tree,data);
+//     if(node!=NULL){
+//       Node* parent=findParentOf(tree,node);
+//       if(parent==NULL){
+//         // node is main parent then don't remove it 
+//         printf("you cant remove main parent of the tree ... atleast for now\n");
+//         return ;
+//       }
+//       //divide this to three cases that i learned from claude for now ... atleast
+//       //state one: it has no children , free it and stop from its parents pointing it
+//       if(node->left==NULL&&node->right==NULL){
+//         if(parent->left==node) parent->left=NULL;
+//         if(parent->right==node) parent->right=NULL;
+//         free(node);
+//         node=NULL;
+//       }
+//       //state two: it has one child, move that child its position 
+//       if ((node->left != NULL) != (node->right != NULL)){
+//            Node* child=node->left==NULL?node->right:node->left;
+//            if(parent->left==node) parent->left=child;
+//            if(parent->right==node)parent->right=child;
+//             free(node);
+//             node=NULL;
+//           }   
+//       //state three: it has ttwo children,
+//         if(node->left!=NULL && node->right!=NULL){
+//             //--todo remove that node and replace with right subtree min:
+//             //make subtree of right of leaving node
+//             BST* subtree= makeSubTree(node->right);
+//             //find left most of that subtree which is min
+//             Node* minOfRight=findMin(subtree);
+//             //find parent of that right min
+//             Node* parentOfMinOfRight=findParentOf(subtree,minOfRight);
+//             free(subtree);
+//             subtree=NULL;
+//             //find child of minofright ... it is always right if it had left it will be min
+//             Node* childOfMinOfRight=minOfRight->right;// since it is min it dont have left , it can be null but we dont care now
+//             //parentofMinOfRight takes childofminofright position of minofright
+//             if(parentOfMinOfRight->left==minOfRight) parentOfMinOfRight->left=childOfMinOfRight;
+//             if(parentOfMinOfRight->right==minOfRight) parentOfMinOfRight->right=childOfMinOfRight;                
+//             //now parentofMinOfright released minofright and it can go any where
+//             //if node was left of its parent then left will be replaced by minofright
+//             if(parent->left==node) parent->left=minOfRight;
+//             //if node was right of its parent then right will be replaced by minofright
+//             if(parent->right==node) parent->right=minOfRight;
+//             //min of right take position of node
+//             minOfRight->right=node->right;
+//             minOfRight->left=node->left;
+//             free(node);
+//             node=NULL;
+//             }
+            
+//             tree->count-=1;
+//         }
+//       else{
+//      printf("------:so you cant remove what you dont have\n");
+//      return;
+//     }
+//     }
+
 void removeNode(BST *tree, int data)
 {
-    Node* node=find(tree,data);
-    if(node!=NULL){
-      Node* parent=findParentOf(tree,node);
-      if(parent==NULL){
-        // node is main parent then don't remove it 
-        printf("you cant remove main parent of the tree ... atleast for now\n");
-        return ;
-      }
-      //divide this to three cases that i learned from claude for now ... atleast
-      //state one: it has no children , free it and stop from its parents pointing it
-      if(node->left==NULL&&node->right==NULL){
-        if(parent->left==node) parent->left=NULL;
-        if(parent->right==node) parent->right=NULL;
-        free(node);
-      }
-      if(node->left!=NULL||node->right!=NULL){//-----------either or both
-          //state three: it has ttwo children,
-          if(node->left!=NULL&&node->right!=NULL){//------------both
-              //--todo remove that node and replace what deserves its position?
-              
-        }else{//_----either
-          //state two: it has one child, move that child its position
-           Node* child=node->left==NULL?node->right:node->left;
-           if(parent->left==node) parent->left=child;
-           if(parent->right==node)parent->right=child;
+    Node* node = find(tree, data);
+    if(node != NULL){
+        Node* parent = findParentOf(tree, node);
+        if(parent == NULL){
+            // node is main parent then don't remove it
+            printf("you cant remove main parent of the tree ... atleast for now\n");
+            return;
+        }
+
+        // state one: no children
+        if(node->left == NULL && node->right == NULL){
+            if(parent->left == node) parent->left = NULL;
+            if(parent->right == node) parent->right = NULL;
             free(node);
-          }   
-      }
-      tree->count-=1;
+            node = NULL;
+        }
+        // state two: exactly one child
+        else if((node->left != NULL) != (node->right != NULL)){
+            Node* child = node->left == NULL ? node->right : node->left;
+            if(parent->left == node) parent->left = child;
+            if(parent->right == node) parent->right = child;
+            free(node);
+            node = NULL;
+        }
+        // state three: two children
+        else{
+            Node* minOfRight = node->right;
+            // walk down to the leftmost node of node->right, tracking its parent
+            Node* parentOfMinOfRight = node; // node is minOfRight's parent if it has no left child
+            while(minOfRight->left != NULL){
+                parentOfMinOfRight = minOfRight;
+                minOfRight = minOfRight->left;
+            }
+
+            if(parentOfMinOfRight == node){
+                // special case: node->right itself is the successor
+                // minOfRight keeps its own right child as-is,
+                // just adopt node->left
+                minOfRight->left = node->left;
+            }else{
+                // general case: successor is deeper down
+                // detach minOfRight from its parent, splicing up its right child
+                parentOfMinOfRight->left = minOfRight->right;
+
+                // now minOfRight takes node's exact position and children
+                minOfRight->left = node->left;
+                minOfRight->right = node->right;
+            }
+
+            if(parent->left == node) parent->left = minOfRight;
+            if(parent->right == node) parent->right = minOfRight;
+
+            free(node);
+            node = NULL;
+        }
+
+        tree->count -= 1;
     }else{
-     printf("------:so you cant remove what you dont have\n");
-     return;
+        printf("------:so you cant remove what you dont have\n");
+        return;
     }
 }
-
 void freeing(Node* root)
 {
     int capacity=16;
