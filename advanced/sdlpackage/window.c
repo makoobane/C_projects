@@ -9,20 +9,48 @@ SDL_Window * window;
 SDL_Renderer * renderer;
 };
 bool initialize_SDL(struct Game* game);
-void freeing(struct Game* game);
+void freeing(struct Game* game,int exit_status);
 int main(){
     struct Game game={.window=NULL,.renderer=NULL,};
     bool initflag=initialize_SDL(&game);
     //NOTE: init flag will be true if main init or renderer or windows one of them fails so it is true on error state
     if(initflag==true){
-        freeing(&game);
-        exit(1);
+        //error occured 
+        freeing(&game,EXIT_FAILURE);
     }//else if there is no error on initializing it will return false then we will continue 
-    // SDL_RenderClear(game.renderer);
-    SDL_RenderPresent(game.renderer);
-    SDL_Delay(7000);
-    freeing(&game);
+    while (true)// keep screen alive
+    {
+        SDL_Event event;
+        while (SDL_PollEvent(&event))
+        {
+            switch (event.type)
+            {
+                //you can close screen while closing
+            case SDL_QUIT:
+                freeing(&game,EXIT_SUCCESS);
+                break;
+                //or click M
+            case SDL_KEYDOWN:
+                switch (event.key.keysym.scancode)
+                {
+                case SDL_SCANCODE_M:
+                    freeing(&game,EXIT_SUCCESS);
+                    break;
+                default:
+                    break;
+                }
+            default:
+                break;
+            }
+        }
+        
+        SDL_RenderClear(game.renderer);
+        SDL_RenderPresent(game.renderer);
+        SDL_Delay(16); //16X60 frames/second=960ms so it fit for 60fps
+    }
+    
     puts("end");
+    freeing(&game,EXIT_SUCCESS); 
     return 0;
 }
 bool initialize_SDL(struct Game* game){
@@ -46,8 +74,9 @@ bool initialize_SDL(struct Game* game){
     }
     return false;
 }
-void freeing(struct Game* game){
+void freeing(struct Game* game,int exit_status){
     SDL_DestroyRenderer(game->renderer);
     SDL_DestroyWindow(game->window);
     SDL_Quit();
+    exit(exit_status);
 }
