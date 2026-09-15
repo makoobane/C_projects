@@ -1,4 +1,6 @@
 #include<stdio.h>
+#include <time.h>
+#include <stdlib.h>
 #include <stdbool.h>
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_image.h>
@@ -18,6 +20,7 @@ int main(){
     // const SDL_Rect rect={350,250,100,100};
     struct Game game={.window=NULL,.renderer=NULL,.background=NULL};
     bool initflag=initialize_SDL(&game);
+    srand(time(NULL));
     //NOTE: init flag will be true if main init or renderer or windows one of them fails so it is true on error state
     if(initflag==true){
         //error occured 
@@ -46,16 +49,25 @@ int main(){
                 case SDL_SCANCODE_M:
                     freeing(&game,EXIT_SUCCESS);
                     break;
+                case SDL_SCANCODE_SPACE://if space bar is clicked
+                  unsigned short int r=rand()%255;
+                  unsigned short int g=rand()%255;
+                  unsigned short int b=rand()%255;
+                  unsigned short int a=rand()%255;
+                  SDL_SetRenderDrawColor(game.renderer,r,g,b,a);//set color of background to red;
+                    break;
+
                 default:
                     break;
                 }
+                break;
             default:
                 break;
             }
         }
         
         SDL_RenderClear(game.renderer);//delete each frame to render another
-        SDL_RenderCopy(game.renderer,game.background,NULL,NULL);
+        SDL_RenderCopy(game.renderer,game.background,NULL,NULL);//sets background image
         SDL_RenderPresent(game.renderer);//draw every frame again
         SDL_Delay(16); //16X60 frames/second=960ms so it fit for 60fps
     }
@@ -64,6 +76,7 @@ int main(){
     return 0;
 }
 bool initialize_SDL(struct Game* game){
+  
     //initailize sdl
     int error=SDL_Init(SDL_INIT_EVERYTHING);
     if(error!=0){
