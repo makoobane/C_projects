@@ -4,21 +4,31 @@
 #include <stdbool.h>
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_image.h>
+#include <SDL2/SDL_ttf.h>
 #define Window_title "window"
 #define IMAGE_FLAGS IMG_INIT_PNG
+#define FONT_SIZE 80
 #define windows_width 800
 #define windows_height 600
+
 struct Game{
 SDL_Window * window;
 SDL_Renderer * renderer;
 SDL_Texture * background;
+TTF_Font* font;
+SDL_Color text_color;
+SDL_Rect text_rect;
+SDL_Texture* text_texture;
+
 };
 bool initialize_SDL(struct Game* game);
 bool load_media(struct Game* game);
 void freeing(struct Game* game,int exit_status);
 int main(){
     // const SDL_Rect rect={350,250,100,100};
-    struct Game game={.window=NULL,.renderer=NULL,.background=NULL};
+    struct Game game={.window=NULL,
+        .text_texture=NULL,
+        .renderer=NULL,.background=NULL,.font=NULL,.text_color={.r=255,.g=255,.b=255,.a=255},.text_rect={0,0,0,0}};
     bool initflag=initialize_SDL(&game);
     srand(time(NULL));
     //NOTE: init flag will be true if main init or renderer or windows one of them fails so it is true on error state
@@ -68,6 +78,7 @@ int main(){
         
         SDL_RenderClear(game.renderer);//delete each frame to render another
         SDL_RenderCopy(game.renderer,game.background,NULL,NULL);//sets background image
+        SDL_RenderCopy(game.renderer,game.text_texture,NULL, &(game.text_rect));
         SDL_RenderPresent(game.renderer);//draw every frame again
         SDL_Delay(16); //16X60 frames/second=960ms so it fit for 60fps
     }
@@ -78,7 +89,7 @@ int main(){
 bool initialize_SDL(struct Game* game){
   
     //initailize sdl
-    int error=SDL_Init(SDL_INIT_EVERYTHING);
+    int error=SDL_Init(SDL_INIT_VIDEO);
     if(error!=0){
         fprintf(stderr, "error happened at main initalization off sdl: %s\n",SDL_GetError());
         return true;
@@ -90,6 +101,12 @@ bool initialize_SDL(struct Game* game){
     int init_flag=IMG_Init(IMAGE_FLAGS);
     if((init_flag & IMAGE_FLAGS)!=IMAGE_FLAGS){//0100&0100=0100 if not it is error
         fprintf(stderr,"error ocuured at image initialization: %s\n",IMG_GetError());
+        return true;
+    }
+    //initialize text ttf
+   short int ttf_i= TTF_Init();//0 for success and -1 for error
+    if(ttf_i==-1){
+        fprintf(stderr,"it failed ttf init:%s\n",TTF_GetError());
         return true;
     }
     //create window
@@ -113,14 +130,59 @@ bool load_media(struct Game *game)
         fprintf(stderr,"loading image failed: %s\n",IMG_GetError());
         return true;
     }
+    //oopen font and make sdl_font
+    game->font= TTF_OpenFont("fonts/freesansbold.ttf",FONT_SIZE);
+    if(game->font==NULL){
+        fprintf(stderr,"loading font failed:%s\n",TTF_GetError());
+        return true;
+    }
+    //convert it to surface based on that font size and text
+    SDL_Surface* surface=TTF_RenderText_Blended(game->font,"Hello",game->text_color);
+    if(surface==NULL){
+        fprintf(stderr,"error on rendertext:%s\n",SDL_GetError());
+        return true;
+    }
+    //convert it textue
+    game->text_texture=SDL_CreateTextureFromSurface(game->renderer,surface);
+    //keeep your text size from that surface
+    game->text_rect.w=surface->w;
+    game->text_rect.h=surface->h;
+    //clean that surface dont store it
+    SDL_FreeSurface(surface);
+    if(game->text_texture==NULL){
+        fprintf(stderr,"error on texture from surface:%s\n",SDL_GetError());
+        return true;
+    }
     return false;
 }
 void freeing(struct Game *game, int exit_status)
 {
+    SDL_DestroyTexture(game->text_texture);
+    TTF_CloseFont(game->font);
     SDL_DestroyTexture(game->background);
     SDL_DestroyRenderer(game->renderer);
     SDL_DestroyWindow(game->window);
     IMG_Quit();
+    TTF_Quit();
     SDL_Quit();
     exit(exit_status);
 }
+/*in IMG of sdl to present image you need just
+1)initialize img
+2)load image wwith render and it will return texture
+3)use texture
+4)destroy texture and quit img
+ */
+
+/* in TTF to present text you need to take those steps:
+1) init ttf
+2)open font and make font
+3)convert that font to surface and keep size
+4)convert surface to texture
+5)rendercopy that new text_texture
+//....de allocating
+6)free surface
+7)close font
+8)destroytexture
+9)quit ttf
+*/
