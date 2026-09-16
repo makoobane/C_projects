@@ -19,7 +19,7 @@ TTF_Font* font;
 SDL_Color text_color;
 SDL_Rect text_rect;
 SDL_Texture* text_texture;
-
+bool inText;
 };
 bool initialize_SDL(struct Game* game);
 bool load_media(struct Game* game);
@@ -28,7 +28,7 @@ int main(){
     // const SDL_Rect rect={350,250,100,100};
     struct Game game={.window=NULL,
         .text_texture=NULL,
-        .renderer=NULL,.background=NULL,.font=NULL,.text_color={.r=255,.g=255,.b=255,.a=255},.text_rect={0,0,0,0}};
+        .renderer=NULL,.background=NULL,.font=NULL,.text_color={.r=255,.g=255,.b=255,.a=255},.text_rect={0,0,0,0},.inText=false};
     bool initflag=initialize_SDL(&game);
     srand(time(NULL));
     //NOTE: init flag will be true if main init or renderer or windows one of them fails so it is true on error state
@@ -41,22 +41,55 @@ int main(){
     if(isLoadingbcgfailed){
         freeing(&game,EXIT_FAILURE);
     }
-    while (true)// keep screen alive
+    bool running =true;
+    while (running)// keep screen alive
     {
         SDL_Event event;
-        while (SDL_PollEvent(&event))
+        while (SDL_PollEvent(&event))//listen events in every 16ms 
         {
-            switch (event.type)
+            switch (event.type)//separate event based on their types like draging,close window,click key
             {
                 //you can close screen while closing
             case SDL_QUIT:
                 freeing(&game,EXIT_SUCCESS);
                 break;
-                //or click M
-            case SDL_KEYDOWN:
-                switch (event.key.keysym.scancode)
-                {
-                case SDL_SCANCODE_M:
+                //if mouse started draging or pushing
+            case SDL_MOUSEBUTTONDOWN:
+                puts("down");
+                bool isInText=false;
+                bool xIn=(game.text_rect.w+game.text_rect.x)>event.motion.x&&event.motion.x> game.text_rect.x;
+                bool yIn=(game.text_rect.h+game.text_rect.y)>event.motion.y && event.motion.y>game.text_rect.y;
+                if(xIn && yIn){
+                    puts("it is in");
+                    game.inText=true;// you are on texx
+                }
+                 break;
+            case SDL_MOUSEMOTION:
+                 if(game.inText){
+                     //instead of top right corner this center make center of the text to be moving point
+                     int centerx=game.text_rect.w/2;
+                     int centery=game.text_rect.h/2;
+                     int x=  event.motion.x -centerx;
+                     int y= event.motion.y -centery;
+                    bool Xinborder=(x<(windows_width - game.text_rect.w));
+                    if(Xinborder){
+                    game.text_rect.x=x;//move text rect in x
+                    }
+                    bool Yinborder=(y<(windows_height-game.text_rect.h));
+                    if(Yinborder){
+                        game.text_rect.y=y;//move text rect in y
+                    }
+                 }
+                 break;
+            case SDL_MOUSEBUTTONUP:
+             
+                 game.inText=false;//draging ended
+                 break;
+                 case SDL_KEYDOWN://if event is key is pressed
+                 switch (event.key.keysym.scancode)//separate keys based on their scancode
+                 {
+                     case SDL_SCANCODE_M:
+                     //or click M
                     freeing(&game,EXIT_SUCCESS);
                     break;
                 case SDL_SCANCODE_SPACE://if space bar is clicked
