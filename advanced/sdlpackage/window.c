@@ -20,15 +20,25 @@ SDL_Color text_color;
 SDL_Rect text_rect;
 SDL_Texture* text_texture;
 bool inText;
+SDL_Texture* sprite_image;
+SDL_Rect sprite_position;
+int sprite_speed;
+const uint8_t* keyState;
 };
 bool initialize_SDL(struct Game* game);
 bool load_media(struct Game* game);
+void updateSprite(struct Game* game);
 void freeing(struct Game* game,int exit_status);
 int main(){
     // const SDL_Rect rect={350,250,100,100};
     struct Game game={.window=NULL,
         .text_texture=NULL,
-        .renderer=NULL,.background=NULL,.font=NULL,.text_color={.r=255,.g=255,.b=255,.a=255},.text_rect={0,0,0,0},.inText=false};
+        .renderer=NULL,.background=NULL,.font=NULL,
+        .text_color={.r=255,.g=255,.b=255,.a=255},
+        .text_rect={0,0,0,0},.inText=false,
+    .sprite_image=NULL,
+    .sprite_position={.x=0,.y=0,.w=0,.h=0},.sprite_speed=5,
+.keyState=SDL_GetKeyboardState(NULL)};
     bool initflag=initialize_SDL(&game);
     srand(time(NULL));
     //NOTE: init flag will be true if main init or renderer or windows one of them fails so it is true on error state
@@ -51,6 +61,7 @@ int main(){
             {
                 //you can close screen while closing
             case SDL_QUIT:
+                running=false;
                 freeing(&game,EXIT_SUCCESS);
                 break;
                 //if mouse started draging or pushing
@@ -71,11 +82,11 @@ int main(){
                      int centery=game.text_rect.h/2;
                      int x=  event.motion.x -centerx;
                      int y= event.motion.y -centery;
-                    bool Xinborder=(x<(windows_width - game.text_rect.w));
+                    bool Xinborder=(x<(windows_width - game.text_rect.w))&&x>0;
                     if(Xinborder){
                     game.text_rect.x=x;//move text rect in x
                     }
-                    bool Yinborder=(y<(windows_height-game.text_rect.h));
+                    bool Yinborder=(y<(windows_height-game.text_rect.h))&&y>0;
                     if(Yinborder){
                         game.text_rect.y=y;//move text rect in y
                     }
@@ -88,8 +99,9 @@ int main(){
                  case SDL_KEYDOWN://if event is key is pressed
                  switch (event.key.keysym.scancode)//separate keys based on their scancode
                  {
-                     case SDL_SCANCODE_M:
+                 case SDL_SCANCODE_M:
                      //or click M
+                    running=false;
                     freeing(&game,EXIT_SUCCESS);
                     break;
                 case SDL_SCANCODE_SPACE://if space bar is clicked
@@ -99,7 +111,7 @@ int main(){
                   unsigned short int a=rand()%255;
                   SDL_SetRenderDrawColor(game.renderer,r,g,b,a);//set color of background to red;
                     break;
-
+             
                 default:
                     break;
                 }
@@ -108,12 +120,20 @@ int main(){
                 break;
             }
         }
-        
-        SDL_RenderClear(game.renderer);//delete each frame to render another
-        SDL_RenderCopy(game.renderer,game.background,NULL,NULL);//sets background image
+        //update sprite position by listening which key is pressed
+        updateSprite(&game);
+        //delete each frame to render another
+        SDL_RenderClear(game.renderer);
+        //sets background image
+        SDL_RenderCopy(game.renderer,game.background,NULL,NULL);
+        //render text
         SDL_RenderCopy(game.renderer,game.text_texture,NULL, &(game.text_rect));
-        SDL_RenderPresent(game.renderer);//draw every frame again
-        SDL_Delay(16); //16X60 frames/second=960ms so it fit for 60fps
+        //render sprite
+        SDL_RenderCopy(game.renderer,game.sprite_image,NULL,&(game.sprite_position));
+        //draw every frame again
+        SDL_RenderPresent(game.renderer);
+        //16X60 frames/second=960ms so it fit for 60fps
+        SDL_Delay(16); 
     }
     
     freeing(&game,EXIT_SUCCESS); 
@@ -163,6 +183,18 @@ bool load_media(struct Game *game)
         fprintf(stderr,"loading image failed: %s\n",IMG_GetError());
         return true;
     }
+    //load sprite image
+    game->sprite_image=IMG_LoadTexture(game->renderer,"images/c.png");
+    if(game->sprite_image==NULL){
+        fprintf(stderr,"error happened at sprite load:%s\n",IMG_GetError());
+        return true;
+    }
+    //query texture: 0 on success and negative on error
+    int query=SDL_QueryTexture(game->sprite_image,NULL,NULL,&(game->sprite_position.w),&(game->sprite_position.h));
+    if(query){//negative
+        fprintf(stderr,"error happened at query:%s\n",SDL_GetError());
+        return true;
+    }
     //oopen font and make sdl_font
     game->font= TTF_OpenFont("fonts/freesansbold.ttf",FONT_SIZE);
     if(game->font==NULL){
@@ -188,8 +220,26 @@ bool load_media(struct Game *game)
     }
     return false;
 }
+void updateSprite(struct Game* game){
+    
+    if(game->keyState[SDL_SCANCODE_LEFT]){
+        game->sprite_position.x-=game->sprite_speed;
+    }
+    if(game->keyState[SDL_SCANCODE_RIGHT]){
+        game->sprite_position.x+=game->sprite_speed;
+    }
+ 
+     if(game->keyState[SDL_SCANCODE_UP]){
+        game->sprite_position.y-=game->sprite_speed;
+    }
+    if(game->keyState[SDL_SCANCODE_DOWN]){
+        game->sprite_position.y+=game->sprite_speed;
+    
+}
+}
 void freeing(struct Game *game, int exit_status)
 {
+    SDL_DestroyTexture(game->sprite_image);
     SDL_DestroyTexture(game->text_texture);
     TTF_CloseFont(game->font);
     SDL_DestroyTexture(game->background);
