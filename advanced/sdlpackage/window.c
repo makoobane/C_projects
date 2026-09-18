@@ -5,11 +5,54 @@
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_image.h>
 #include <SDL2/SDL_ttf.h>
+#include <SDL2/SDL_mixer.h>
 #define Window_title "window"
 #define IMAGE_FLAGS IMG_INIT_PNG
+#define MIXER_FLAGS MIX_INIT_OGG
 #define FONT_SIZE 80
 #define windows_width 800
 #define windows_height 600
+
+/*in IMG of sdl to present image you need just
+1)initialize img
+2)load image wwith render and it will return texture
+3)use texture
+4)destroy texture and quit img
+ */
+
+/* in TTF to present text you need to take those steps:
+1) init ttf
+2)open font and make font
+3)convert that font to surface and keep size
+4)convert surface to texture
+5)rendercopy that new text_texture
+//....de allocating
+6)free surface
+7)close font
+8)destroytexture
+9)quit ttf
+*/
+/* in SDL2_mixer to play sound you need this below:
+1) Mix init to initialize it with flag
+2)open Audio which needs frequancey, channel,format,
+3)load chunk which needs file path of sound file
+4) playChannel to produce that sound it takes chunk* and -1 for first channel and 0 for not looping
+..........de allocatin
+5)haltchannel (-1 for all channels)
+6)freechunck
+7)close audio
+8)quit mixer
+
+also in this library to play music you need:
+1)init mixer
+2)load music file to mix_music*
+3) play music while giving -1 for looping but it must be outside of the game loop
+//NOTE: you need to have abitity to pause it when needed
+//de allocating
+4)halt music
+4)free music
+
+*/
 
 struct Game{
 SDL_Window * window;
@@ -24,6 +67,8 @@ SDL_Texture* sprite_image;
 SDL_Rect sprite_position;
 int sprite_speed;
 const uint8_t* keyState;
+Mix_Chunk* sound;
+Mix_Music* music;
 };
 bool initialize_SDL(struct Game* game);
 bool load_media(struct Game* game);
@@ -33,15 +78,20 @@ int main(){
     // const SDL_Rect rect={350,250,100,100};
     struct Game game={.window=NULL,
         .text_texture=NULL,
-        .renderer=NULL,.background=NULL,.font=NULL,
+        .renderer=NULL,
+        .background=NULL,
+        .font=NULL,
         .text_color={.r=255,.g=255,.b=255,.a=255},
-        .text_rect={0,0,0,0},.inText=false,
-    .sprite_image=NULL,
-    .sprite_position={.x=0,.y=0,.w=0,.h=0},.sprite_speed=5,
-.keyState=SDL_GetKeyboardState(NULL)};
-    bool initflag=initialize_SDL(&game);
+        .text_rect={0,0,0,0},
+        .inText=false,
+        .sprite_image=NULL,
+       .sprite_position={.x=0,.y=0,.w=0,.h=0},
+       .sprite_speed=5,
+       .sound=NULL,
+       .keyState=SDL_GetKeyboardState(NULL)};
     srand(time(NULL));
-    //NOTE: init flag will be true if main init or renderer or windows one of them fails so it is true on error state
+    bool initflag=initialize_SDL(&game);
+       //NOTE: init flag will be true if main init or renderer or windows one of them fails so it is true on error state
     if(initflag==true){
         //error occured 
         freeing(&game,EXIT_FAILURE);
@@ -51,6 +101,13 @@ int main(){
     if(isLoadingbcgfailed){
         freeing(&game,EXIT_FAILURE);
     }
+    //play background music
+    int perr=Mix_PlayMusic(game.music,-1);//-1 means loop infinitely
+    if(perr){
+        fprintf(stderr,"music play of the background failed:%s\n",Mix_GetError());
+        freeing(&game,EXIT_FAILURE);
+    }
+    //game loop
     bool running =true;
     while (running)// keep screen alive
     {
@@ -110,8 +167,17 @@ int main(){
                   unsigned short int b=rand()%255;
                   unsigned short int a=rand()%255;
                   SDL_SetRenderDrawColor(game.renderer,r,g,b,a);//set color of background to red;
+                  Mix_PlayChannel(-1,game.sound,0);// this sound will not be stopped by the loop
                     break;
-             
+                case SDL_SCANCODE_P:
+                    int paused=Mix_PausedMusic();//1 for pause 0 for not paused
+                    if(paused==1){
+                       Mix_ResumeMusic();
+                    }else{//not paussed
+                        
+                       Mix_PauseMusic();
+                    }
+                    break;
                 default:
                     break;
                 }
@@ -142,7 +208,7 @@ int main(){
 bool initialize_SDL(struct Game* game){
   
     //initailize sdl
-    int error=SDL_Init(SDL_INIT_VIDEO);
+    int error=SDL_Init(SDL_INIT_EVERYTHING);
     if(error!=0){
         fprintf(stderr, "error happened at main initalization off sdl: %s\n",SDL_GetError());
         return true;
@@ -155,6 +221,12 @@ bool initialize_SDL(struct Game* game){
     if((init_flag & IMAGE_FLAGS)!=IMAGE_FLAGS){//0100&0100=0100 if not it is error
         fprintf(stderr,"error ocuured at image initialization: %s\n",IMG_GetError());
         return true;
+    }
+    //initialize mixer
+    int flag= Mix_Init(MIXER_FLAGS);
+    if((flag&MIXER_FLAGS)!=MIXER_FLAGS){
+       fprintf(stderr,"error happended at mixer init:%s\n",Mix_GetError());
+       return true;
     }
     //initialize text ttf
    short int ttf_i= TTF_Init();//0 for success and -1 for error
@@ -174,6 +246,14 @@ bool initialize_SDL(struct Game* game){
         fprintf(stderr,"error happened at render creation: %s\n",SDL_GetError());
         return true;
     }
+    //set iccon
+    SDL_Surface* icon=IMG_Load("images/c.png");
+    if(icon==NULL){
+        fprintf(stderr,"error at icon making:%s\n",IMG_GetError());
+        return true;
+    }
+    SDL_SetWindowIcon(game->window,icon);
+    SDL_FreeSurface(icon);// you free it after use
     return false;
 }
 bool load_media(struct Game *game)
@@ -218,6 +298,23 @@ bool load_media(struct Game *game)
         fprintf(stderr,"error on texture from surface:%s\n",SDL_GetError());
         return true;
     }
+    //open mixer audio
+    int err= Mix_OpenAudio(MIX_DEFAULT_FREQUENCY,MIX_DEFAULT_FORMAT,MIX_DEFAULT_CHANNELS,1024);
+    if(err!=0){
+        fprintf(stderr,"error at openAudo:%s\n",Mix_GetError());
+        return true;
+    }
+   //load sound file
+   game->sound=Mix_LoadWAV("sounds/SDL.ogg");
+   if(game->sound==NULL){
+    fprintf(stderr,"it failed sound loading:%s\n",Mix_GetError());
+    return true;
+   }
+   game->music=Mix_LoadMUS("music/freesoftwaresong-8bit.ogg");
+   if(game->music==NULL){
+    fprintf(stderr,"error at music file load:%s\n",Mix_GetError());
+    return true;
+   }
     return false;
 }
 void updateSprite(struct Game* game){
@@ -229,7 +326,7 @@ void updateSprite(struct Game* game){
         game->sprite_position.x+=game->sprite_speed;
     }
  
-     if(game->keyState[SDL_SCANCODE_UP]){
+    if(game->keyState[SDL_SCANCODE_UP]){
         game->sprite_position.y-=game->sprite_speed;
     }
     if(game->keyState[SDL_SCANCODE_DOWN]){
@@ -239,33 +336,22 @@ void updateSprite(struct Game* game){
 }
 void freeing(struct Game *game, int exit_status)
 {
+    Mix_HaltMusic();
+    Mix_HaltChannel(-1);
+    Mix_CloseAudio();
+    TTF_CloseFont(game->font);
+    Mix_FreeMusic(game->music);
+    Mix_FreeChunk(game->sound);
     SDL_DestroyTexture(game->sprite_image);
     SDL_DestroyTexture(game->text_texture);
-    TTF_CloseFont(game->font);
     SDL_DestroyTexture(game->background);
     SDL_DestroyRenderer(game->renderer);
     SDL_DestroyWindow(game->window);
+
+    Mix_Quit();
     IMG_Quit();
     TTF_Quit();
     SDL_Quit();
     exit(exit_status);
 }
-/*in IMG of sdl to present image you need just
-1)initialize img
-2)load image wwith render and it will return texture
-3)use texture
-4)destroy texture and quit img
- */
 
-/* in TTF to present text you need to take those steps:
-1) init ttf
-2)open font and make font
-3)convert that font to surface and keep size
-4)convert surface to texture
-5)rendercopy that new text_texture
-//....de allocating
-6)free surface
-7)close font
-8)destroytexture
-9)quit ttf
-*/
