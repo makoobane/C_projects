@@ -1,0 +1,2 @@
+gcc -g -fsanitize=address file.c -o file $(pkg-config --cflags --libs sdl2 SDL2_image SDL2_ttf SDL2_mixer ...)
+gdb ./file

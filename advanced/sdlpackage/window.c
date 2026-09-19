@@ -349,13 +349,13 @@ void freeing(struct Game *game, int exit_status)
     TTF_CloseFont(game->font);
     Mix_FreeMusic(game->music);
     Mix_FreeChunk(game->sound);
+    Mix_CloseAudio();
     SDL_DestroyTexture(game->sprite_image);
     SDL_DestroyTexture(game->text_texture);
     SDL_DestroyTexture(game->background);
     SDL_DestroyRenderer(game->renderer);
     SDL_DestroyWindow(game->window);
     
-    Mix_CloseAudio();
     Mix_Quit();
     IMG_Quit();
     TTF_Quit();
