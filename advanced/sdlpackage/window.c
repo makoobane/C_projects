@@ -344,6 +344,7 @@ void updateSprite(struct Game* game){
 }
 void freeing(struct Game *game, int exit_status)
 {
+    printf("size of bool in this device is :%zu\n",sizeof(bool));
     Mix_HaltMusic();
     Mix_HaltChannel(-1);
     TTF_CloseFont(game->font);
