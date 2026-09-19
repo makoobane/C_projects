@@ -10,8 +10,7 @@
 #define IMAGE_FLAGS IMG_INIT_PNG
 #define MIXER_FLAGS MIX_INIT_OGG
 #define FONT_SIZE 80
-#define windows_width 800
-#define windows_height 600
+
 
 /*in IMG of sdl to present image you need just
 1)initialize img
@@ -53,6 +52,8 @@ also in this library to play music you need:
 4)free music
 
 */
+int  windows_width =800;
+int windows_height =600;
 
 struct Game{
 SDL_Window * window;
@@ -85,28 +86,29 @@ int main(){
         .text_rect={0,0,0,0},
         .inText=false,
         .sprite_image=NULL,
-       .sprite_position={.x=0,.y=0,.w=0,.h=0},
-       .sprite_speed=5,
-       .sound=NULL,
-       .keyState=SDL_GetKeyboardState(NULL)};
-    srand(time(NULL));
-    bool initflag=initialize_SDL(&game);
-       //NOTE: init flag will be true if main init or renderer or windows one of them fails so it is true on error state
-    if(initflag==true){
-        //error occured 
-        freeing(&game,EXIT_FAILURE);
-    }//else if there is no error on initializing it will return false then we will continue 
-    //check if background image is failed
-    bool isLoadingbcgfailed=load_media(&game);
-    if(isLoadingbcgfailed){
-        freeing(&game,EXIT_FAILURE);
-    }
-    //play background music
-    int perr=Mix_PlayMusic(game.music,-1);//-1 means loop infinitely
+        .sprite_position={.x=0,.y=0,.w=0,.h=0},
+        .sprite_speed=5,
+        .sound=NULL,
+        .keyState=SDL_GetKeyboardState(NULL)};
+        srand(time(NULL));
+        bool initflag=initialize_SDL(&game);
+        //NOTE: init flag will be true if main init or renderer or windows one of them fails so it is true on error state
+        if(initflag==true){
+            //error occured 
+            freeing(&game,EXIT_FAILURE);
+        }//else if there is no error on initializing it will return false then we will continue 
+        //check if background image is failed
+        bool isLoadingbcgfailed=load_media(&game);
+        if(isLoadingbcgfailed){
+            freeing(&game,EXIT_FAILURE);
+        }
+        //play background music
+        int perr=Mix_PlayMusic(game.music,-1);//-1 means loop infinitely
     if(perr){
         fprintf(stderr,"music play of the background failed:%s\n",Mix_GetError());
         freeing(&game,EXIT_FAILURE);
     }
+    printf("current driver :%s\n",SDL_GetCurrentVideoDriver());
     //game loop
     bool running =true;
     while (running)// keep screen alive
@@ -182,6 +184,12 @@ int main(){
                     break;
                 }
                 break;
+            case SDL_WINDOWEVENT://if it is window event
+                if(event.window.event==SDL_WINDOWEVENT_RESIZED){// and it is rezised resize
+                    windows_width=event.window.data1;
+                    windows_height=event.window.data2;
+                }
+                break;
             default:
                 break;
             }
@@ -235,7 +243,7 @@ bool initialize_SDL(struct Game* game){
         return true;
     }
     //create window
-    game->window=SDL_CreateWindow(Window_title,SDL_WINDOWPOS_CENTERED,SDL_WINDOWPOS_CENTERED,windows_width,windows_height,0);
+    game->window=SDL_CreateWindow(Window_title,SDL_WINDOWPOS_CENTERED,SDL_WINDOWPOS_CENTERED,windows_width,windows_height,SDL_WINDOW_SHOWN|SDL_WINDOW_RESIZABLE);
     if(game->window==NULL){
         fprintf(stderr,"Error happened at window creation:%s\n",SDL_GetError());
         return true;
@@ -338,7 +346,6 @@ void freeing(struct Game *game, int exit_status)
 {
     Mix_HaltMusic();
     Mix_HaltChannel(-1);
-    Mix_CloseAudio();
     TTF_CloseFont(game->font);
     Mix_FreeMusic(game->music);
     Mix_FreeChunk(game->sound);
@@ -347,7 +354,8 @@ void freeing(struct Game *game, int exit_status)
     SDL_DestroyTexture(game->background);
     SDL_DestroyRenderer(game->renderer);
     SDL_DestroyWindow(game->window);
-
+    
+    Mix_CloseAudio();
     Mix_Quit();
     IMG_Quit();
     TTF_Quit();
