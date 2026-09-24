@@ -14,8 +14,9 @@
     SDL_Texture* texture;
     uint32_t* buffer;
 }FrameBuffer;
-
 bool SDL_Initialize(FrameBuffer* buffer);
+void put_colorAt(int x, int y , uint32_t color,FrameBuffer* buffer);
+void fillColor(uint32_t color,FrameBuffer* buffer);
 void freeing(FrameBuffer* buffer,int exit_code);
 int main(){
     FrameBuffer buffer={
@@ -28,6 +29,7 @@ int main(){
     if(init_success==false){
         freeing(&buffer,EXIT_FAILURE);
     }
+    int frame=0;
     bool running=true;
     while(running){
         SDL_Event event;
@@ -39,16 +41,37 @@ int main(){
                 running=false;
                 freeing(&buffer,EXIT_SUCCESS);
             break;
-           
-           default:
-            break;
-           }
+           case SDL_KEYDOWN:
+               switch (event.key.keysym.scancode)
+               {
+               case SDL_SCANCODE_SPACE:
+                   put_colorAt(100,100,0XFF000000,&buffer);
+                   break;
+                case SDL_SCANCODE_F:
+                   fillColor(0X00000000,&buffer);
+                   break;
+                   
+                   default:
+                   break;
+                }
+                break;
+                default:
+                break;
+            }
         }
-        
+        int x=frame%WIDTH;
+        int y=HEIGHT/2;
+        put_colorAt(x,y,0XFF00FF,&buffer);
+        SDL_UpdateTexture(buffer.texture,NULL,buffer.buffer,WIDTH*sizeof(uint32_t));
+        //this clears previus draws
         SDL_RenderClear(buffer.renderer);
-        SDL_UpdateTexture(buffer.texture,NULL,buffer.buffer,WIDTH);
+        //that draws
+        SDL_RenderCopy(buffer.renderer,buffer.texture,NULL,NULL);
+        //this shows
         SDL_RenderPresent(buffer.renderer);
-        SDL_Delay(30); //30fps
+        //this keeps
+        SDL_Delay(16);
+        frame+=1;
     }
 
 
@@ -87,8 +110,25 @@ bool SDL_Initialize(FrameBuffer *buffer)
       return false;
    }
    buffer->buffer=bufferpixels;
+   
  
    return true;
+}
+
+void put_colorAt(int x, int y, uint32_t color,FrameBuffer* buffer)
+{
+    if(x<0||x>=WIDTH||y<0||y>=HEIGHT){
+        puts("out of range");
+        return;
+    }
+    buffer->buffer[WIDTH*y+x]=color;
+}
+
+void fillColor(uint32_t color,FrameBuffer* buffer)
+{
+    for(int i=0;i<WIDTH*HEIGHT;i++){
+        buffer->buffer[i]=color;
+    }
 }
 
 void freeing(FrameBuffer *buffer,int exit_code)
