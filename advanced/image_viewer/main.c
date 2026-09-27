@@ -9,12 +9,16 @@
 
 int width=-1;
 int height=-1;
-typedef struct Screen{
+typedef struct RGBColor {
+    uint8_t r, g, b;
+} RGBColor;
+
+typedef struct Screen {
     SDL_Window* window;
-SDL_Surface* surface;
-uint8_t* pixels;
-}Screen;
-uint8_t* readPPMGetDimensionsAndData(const char* filename);
+    SDL_Surface* surface;
+    RGBColor* pixels;
+} Screen;
+RGBColor* readPPMGetDimensionsAndData(const char* filename);
 bool init_SDL(Screen * screen);
 void fillColor(Screen* screen,uint32_t color);
 void drawPixels(Screen* screen);
@@ -31,7 +35,7 @@ int main(){
     //    uint8_t a=0XFF;//no opacity
     //    uint32_t color =SDL_MapRGBA( screen.surface->format,r,g,b,a);
     //    fillColor(&screen,color);
-       
+       drawPixels(&screen);
        SDL_UpdateWindowSurface(screen.window);//update change
        //delay to exist
        SDL_Delay(7000);
@@ -81,22 +85,19 @@ void fillColor(Screen* screen,uint32_t color)
 
 void drawPixels(Screen *screen)
 {
-     SDL_Rect pixel={0,0,.w=1,.h=1};//1 pixel rect size
-     uint32_t color=0;
-    for(int x=0;x<width;x++){
-        for(int y=0;y<height;y++){
-            uint8_t r,g,b;
-            //how to get color from pixels ?
-            pixel.x=x;
-            pixel.y=y;
-            color=SDL_MapRGB(screen->surface->format,r,g,b);
-            SDL_FillRect(screen->surface,&pixel,color);
+    SDL_Rect pixel = {0, 0, .w = 1, .h = 1};
+    for (int y = 0; y < height; y++) {
+        for (int x = 0; x < width; x++) {
+            RGBColor c = screen->pixels[y * width + x];   // row-major index
+            uint32_t color = SDL_MapRGB(screen->surface->format, c.r, c.g, c.b);
+            pixel.x = x;
+            pixel.y = y;
+            SDL_FillRect(screen->surface, &pixel, color);
         }
     }
 }
-
-uint8_t* readPPMGetDimensionsAndData(const char *filename) {
-    FILE* fptr = fopen(filename, "rb");   // "rb" — binary mode, matters for portability
+RGBColor* readPPMGetDimensionsAndData(const char *filename) {
+    FILE* fptr = fopen(filename, "rb");
     if (fptr == NULL) {
         puts("it failed to read dimensions");
         exit(1);
@@ -110,30 +111,43 @@ uint8_t* readPPMGetDimensionsAndData(const char *filename) {
     bool commentFound = (strncmp(line, "#", 1) == 0);
     if (commentFound) {
         printf("comment is: %s", line);
-        fgets(line, sizeof(line), fptr);   // now this line should be dimensions
+        fgets(line, sizeof(line), fptr);
     }
     sscanf(line, "%d %d", &width, &height);
 
     char maxval[16];
-    fgets(maxval, sizeof(maxval), fptr);   // big enough buffer avoids the truncation bug
-    // no separate fgetc needed now — fgets with a proper size consumes the \n itself
+    fgets(maxval, sizeof(maxval), fptr);
 
-    size_t data_size = (size_t)width * height * 3;
-    uint8_t* pixels = malloc(data_size);
-    if (pixels == NULL) {
-        fputs("allocation failed\n", stderr);
+    size_t pixel_count = (size_t)width * height;
+    size_t raw_size = pixel_count * 3;
+
+    uint8_t* raw = malloc(raw_size);
+    if (raw == NULL) {
+        fputs("raw allocation failed\n", stderr);
         fclose(fptr);
         exit(1);
     }
 
-    size_t read_count = fread(pixels, 1, data_size, fptr);
-    if (read_count != data_size) {
-        fprintf(stderr, "expected %zu bytes, got %zu\n", data_size, read_count);
+    size_t read_count = fread(raw, 1, raw_size, fptr);
+    fclose(fptr);
+    if (read_count != raw_size) {
+        fprintf(stderr, "expected %zu bytes, got %zu\n", raw_size, read_count);
     }
 
-    
-    fclose(fptr);
-    // pixels now holds raw R,G,B,R,G,B,... — use it, then:
+    RGBColor* pixels = malloc(pixel_count * sizeof(RGBColor));
+    if (pixels == NULL) {
+        fputs("pixel allocation failed\n", stderr);
+        free(raw);
+        exit(1);
+    }
+
+    for (size_t i = 0; i < pixel_count; i++) {
+        pixels[i].r = raw[i * 3 + 0];
+        pixels[i].g = raw[i * 3 + 1];
+        pixels[i].b = raw[i * 3 + 2];
+    }
+
+    free(raw);   // done with the flat buffer now that it's copied into structs
     return pixels;
 }
 
