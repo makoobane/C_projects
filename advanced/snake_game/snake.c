@@ -1,81 +1,125 @@
 #include <stdio.h>
 #include <stdlib.h>
-#include <SDL2/SDL.h>
-
+#include <stdbool.h>
+#include <math.h>
 #include "snake.h"
 
-Snake* create3BoxesSnake(SDL_Rect* box){
+
+
+Snake *createSmallSnake(uint8_t side_length, int posx, int posy)
+{
     Snake* snake=(Snake*)malloc(sizeof(Snake));
     if(snake!=NULL){
-        //allocate three boxes;
+        snake->side_length=side_length;
+        //create 3 snake nodes
         SnakeNode* node1=(SnakeNode*)malloc(sizeof(SnakeNode));
         SnakeNode* node2=(SnakeNode*)malloc(sizeof(SnakeNode));
         SnakeNode* node3=(SnakeNode*)malloc(sizeof(SnakeNode));
-        if(node1!=NULL && node2!=NULL && node3!=NULL){
-           //box1
-           node1->positionOfNode.x=box->x;
-           node1->positionOfNode.y=box->y;
-           node1->positionOfNode.w=box->w;
-           node1->positionOfNode.h=box->h;
-           //box2
-            node2->positionOfNode.x=box->x+box->w;
-            node2->positionOfNode.y=box->y+box->h;
-            node2->positionOfNode.w=box->w;
-            node2->positionOfNode.h=box->h;
-           //box3
-           node3->positionOfNode.x=box->x+(box->w)*2;
-           node3->positionOfNode.y=box->y+(box->h)*2;
-           node3->positionOfNode.w=box->w;
-           node3->positionOfNode.h=box->h;
-           //fill next
+        bool isNode1Exists=node1!=NULL;
+        bool isNode2Exists=node2!=NULL;
+        bool isNode3Exists=node3!=NULL;
+        bool Allright=isNode1Exists && isNode2Exists && isNode3Exists;
+        if(Allright){
+            //box1
+           node1->before=NULL;
            node1->next=node2;
+           //put head position to assigned position 
+           node1->vector->centerX=posx;
+           node1->vector->centerY=posy;
+           node1->vector->xUnit_dir=1.0;
+           node1->vector->yUnit_dir=0.0;
+           //box2
+           node2->before=node1;
            node2->next=node3;
+           node2->vector->centerX=posx+ side_length;
+           node2->vector->centerY=posy+ side_length;
+           node2->vector->xUnit_dir=1.0;
+           node2->vector->yUnit_dir=0.0;
+           
+           //box3
+           node3->before=node2;
            node3->next=NULL;
-           //fill snake data
+           node3->vector->centerX=posx+ 2*side_length;
+           node3->vector->centerY=posy+ 2*side_length;
+           node3->vector->xUnit_dir=1.0;
+           node3->vector->yUnit_dir=0.0;
+
+           //snake
+           //this will make three horizontal line snake 
            snake->head=node1;
            snake->tail=node3;
-           return snake;
+
+
         }else{
-            puts("one of the nodes failed to be allocated for simplicity");
-            if(node1!=NULL) free(node1);
-            if(node2!=NULL) free(node2);
-            if(node3!=NULL) free(node3);
+            if(isNode1Exists){free(node1);}else{ puts("failed to allocate node1");}
+            if(isNode2Exists){free(node2);}else{ puts("failed to allocate node2");}
+            if(isNode3Exists){free(node3);}else{ puts("failed to allocate node3");}
             free(snake);
+            return NULL;
         }
-        
-    }
-    return NULL;
-}
 
-void moveSnake(Snake *snake, int newX, int newY)
-{
-    //move head to new position
-    SnakeNode* head=snake->head;
-    head->positionOfNode.x=newX;
-    head->positionOfNode.y=newY;
-    //problem: how to force other parts to follow foot stepps of the head?:
-    //current IDEA: may be i need to store where head was before movement then next box after head will move to where head was and ....
-    // till  the tail will go where 'before tail box' was
-}
-
-void eatMouse(Snake *snake)
-{
-    SnakeNode* tail=snake->tail;
-    //create snakenode same size as its tail
-    SnakeNode* newNode=(SnakeNode*)malloc(sizeof(SnakeNode));
-    if(newNode!=NULL){
-      newNode->positionOfNode.w=tail->positionOfNode.w;
-      newNode->positionOfNode.h=tail->positionOfNode.h;
-      //but where?
-      //for now just add straight line after tail
-      newNode->positionOfNode.x=tail->positionOfNode.x+tail->positionOfNode.w;
-      newNode->positionOfNode.y=tail->positionOfNode.y+tail->positionOfNode.h;
-      newNode->next=NULL;//it is last element in a queue
-      //link it tail node 
-      tail->next=newNode;
-      //link it to snake as tail
-      snake->tail=newNode;
     }else{
-        puts("it failed to allocate new thing");
+        return NULL;
     }
+}
+
+void changeDirection(Snake *snake,float xDir, float yDir)
+{
+    float currentDirX=snake->head->vector->xUnit_dir;
+    float currentDirY=snake->head->vector->yUnit_dir;
+    float diffX=currentDirX-xDir;
+    float diffY=currentDirY-yDir;
+    float overflowCorrection=0.01;
+    if(atan(diffY/diffX)<=(M_PI/2)+overflowCorrection){
+      snake->head->vector->xUnit_dir=xDir;
+      snake->head->vector->yUnit_dir=yDir;
+    }
+}
+
+void move(Snake* snake,int distance)
+{
+      SnakeNode* head=snake->head;
+      SnakeNode* part=head->next;
+      while (part!=NULL)
+      {
+        SnakeNode* before=part->before;
+        int xApart=part->vector->centerX - before->vector->centerX;
+        int yApart=part->vector->centerY -before->vector->centerY;
+        float length=(float)sqrt(xApart*xApart + yApart*yApart);
+        //find unit vector
+        float xUnit=xApart / length;
+        float yUnit=yApart/length;
+        part->vector->xUnit_dir=xUnit;
+        part->vector->yUnit_dir=yUnit;
+        
+        //move its center towards that new position
+        int dispX=distance* (xUnit*xUnit);
+        int dispY=distance*(yUnit*yUnit);
+        part->vector->centerX+=dispX;
+        part->vector->centerY+=dispY;
+        part=part->next;
+      }
+               
+            
+}
+
+void addBox(Snake *snake)
+{
+    SnakeNode* node=(SnakeNode*)malloc(sizeof(SnakeNode));
+    if(node!=NULL){
+
+    }else{
+        puts("it failed to make new node");
+    }
+}
+
+void destroySnake(Snake *snake)
+{
+    SnakeNode* part=snake->head;
+    while(part!=NULL){
+     SnakeNode* next=part->next;
+     free(part);
+     part=next;
+    }
+    free(snake);
 }
