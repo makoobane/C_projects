@@ -3,30 +3,30 @@
 
 #include <stdint.h>
 
-typedef struct Vector2 {
+struct Vector2 {
 float xUnit_dir;
 float yUnit_dir;
 int centerX;
 int centerY;
-}Vector2;
+};
 
-typedef struct SnakeNode
+struct SnakeNode
 {
-  Vector2* vector;
-  SnakeNode* before;
-  SnakeNode* next;
-}SnakeNode;
+  struct  Vector2* vector;
+  struct SnakeNode* before;
+  struct  SnakeNode* next;
+};
 
-typedef struct Snake{
+struct Snake {
   uint8_t side_length;//of one block of snake 
-  SnakeNode* head;//head of the snake for movements
-  SnakeNode* tail;//tail for adding new element to lengthn snake
-}Snake;
+  struct  SnakeNode* head;//head of the snake for movements
+  struct  SnakeNode* tail;//tail for adding new element to lengthn snake
+};
 
-Snake* createSmallSnake(uint8_t side_length,int posx,int posy);
-void changeDirection(Snake* snake,float xDir,float yDir);
-void move(Snake* snake,int distance);
-void addBox(Snake* snake);
-void destroySnake(Snake* snake);
+struct Snake* createSmallSnake(uint8_t side_length,int posx,int posy);
+void changeDirection(struct Snake* snake,float xDir,float yDir);
+void move(struct Snake* snake,int speed);
+void addBox(struct Snake* snake);
+void destroySnake(struct Snake* snake);
 
 #endif
