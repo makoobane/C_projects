@@ -1,4 +1,6 @@
 #include <stdio.h>
+#include <stdlib.h>
+#include <math.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <SDL2/SDL.h>
@@ -21,22 +23,25 @@ typedef struct Game{
 SDL_Window* window;
 SDL_Renderer* renderer;
 struct Snake* snake;
-int8_t speed;
+float speed;
 enum Starting start;
 struct SnakeDirection direction;
-
+int snakelength;
 }Game;
 bool Init_SDL(Game* game);
 void createSnakeAt(Game* game,uint8_t size,int posx, int posy);
+void fillCircle(SDL_Renderer* r, int cx, int cy, int radius);
 void drawSnake(Game* game);
 void moveSnake(Game* game);
 void changeSnakeDirection(Game* game);
+void eat(Game* game);
 void destroyGame(Game* game,int exit_code);
 int main(){
     Game _={
+        .snakelength=3,
         .direction={.xDir=-1.0,.yDir=0.0},
         .start=STOP,
-        .speed=3,
+        .speed=3.0,
         .snake=NULL,
         .renderer=NULL,
         .window=NULL};
@@ -60,6 +65,9 @@ int main(){
                 {
                     case SDL_SCANCODE_X:
                         running=false;
+                        break;
+                    case SDL_SCANCODE_E://for testing
+                        eat(game);
                         break;
                     case SDL_SCANCODE_SPACE:
                         if(game->start==START){
@@ -149,23 +157,34 @@ void createSnakeAt(Game *game,uint8_t size,int posx, int posy)
     game->snake=snake;
 
 }
+void fillCircle(SDL_Renderer* r, int cx, int cy, int radius)
+{
+    for (int dy = -radius; dy <= radius; dy++) {
+        int dx = (int)sqrtf((float)(radius * radius - dy * dy));
+        SDL_RenderDrawLine(r, cx - dx, cy + dy, cx + dx, cy + dy);
+    }
+}
 
 void drawSnake(Game *game)
 {
-    struct SnakeNode* part=game->snake->head;
-    int sidelength=game->snake->side_length;
-    while (part!=NULL)
-    {
-        SDL_Rect position={.x=0,.y=0,.w=sidelength,.h=sidelength};
-        position.x=part->vector->centerX - sidelength/2;
-        position.y=part->vector->centerY - sidelength/2;
-        // printf("width:%d,h:%d,%d,%d\n",position.w,position.h,position.x,position.y);
-        SDL_SetRenderDrawColor(game->renderer,255,0,0,255);
-        SDL_RenderFillRect(game->renderer,&position);
-       
-        part=part->next;
-    }
-    
+   
+    int MaxRadius = (int)(game->snake->side_length * 0.6f);
+    int i=0;
+    for (struct SnakeNode* n = game->snake->head; n != NULL; n = n->next) {
+        int radius=MaxRadius*(1.0 - (0.1*i)/game->snakelength);
+        if (n == game->snake->head){
+            SDL_SetRenderDrawColor(game->renderer, 2, 10, 10, 255);
+            
+        }
+        else{
+            SDL_SetRenderDrawColor(game->renderer, 250, 0, 0, 255);
+        }
+        fillCircle(game->renderer,
+            (int)n->vector->centerX,
+            (int)n->vector->centerY,
+            radius);
+            i+=1;
+        }
 }
 
 void moveSnake(Game *game)
@@ -179,6 +198,15 @@ void changeSnakeDirection(Game *game)
 {
     if(game->start==START){
         changeDirection(game->snake,game->direction.xDir,game->direction.yDir);
+    }
+}
+
+void eat(Game *game)
+{
+    if(game->start==START){
+        game->snakelength+=1;
+        addBox(game->snake);
+
     }
 }
 

@@ -1,13 +1,13 @@
-#ifndef SNAKE
-#define SNAKE
+#ifndef SNAKE_H
+#define SNAKE_H
 
 #include <stdint.h>
 
 struct Vector2 {
 float xUnit_dir;
 float yUnit_dir;
-int centerX;
-int centerY;
+float centerX;
+float centerY;
 };
 
 struct SnakeNode
@@ -25,7 +25,7 @@ struct Snake {
 
 struct Snake* createSmallSnake(uint8_t side_length,int posx,int posy);
 void changeDirection(struct Snake* snake,float xDir,float yDir);
-void move(struct Snake* snake,int speed);
+void move(struct Snake* snake,float speed);
 void addBox(struct Snake* snake);
 void destroySnake(struct Snake* snake);
 

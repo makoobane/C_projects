@@ -99,73 +99,43 @@ struct Snake *createSmallSnake(uint8_t side_length, int posx, int posy)
 
 void changeDirection(struct Snake *snake,float xDir, float yDir)
 {
-    float currentDirX=snake->head->vector->xUnit_dir;
-    float currentDirY=snake->head->vector->yUnit_dir;
-    float diffX=currentDirX-xDir;
-    float diffY=currentDirY-yDir;
-    float angleRad=atan((diffY/diffX));
-    int angleDeg=(int)((180/M_PI) * angleRad);
-    printf("angle:%d\n",angleDeg);
-    if(angleDeg<91){
-        //you dont need to flip the neck of the snake so just do it when it is less then 90 degree or same as 90
+    //only if the current direction and new direction are 90 to each other then we change head dir
+    int8_t dotproduct=(int8_t) (xDir*snake->head->vector->xUnit_dir + yDir* snake->head->vector->yUnit_dir);
+    if(dotproduct==0){
+
         snake->head->vector->xUnit_dir=xDir;
         snake->head->vector->yUnit_dir=yDir;
     }
+ 
 
 }
-
-void move(struct Snake* snake,int speed)
+void move(struct Snake* snake, float speed)
 {
-     struct  SnakeNode* head=snake->head;
-     //move head
-      int headXmag=(speed)*(head->vector->xUnit_dir*head->vector->xUnit_dir);
-      if(head->vector->xUnit_dir<=0){
-         head->vector->centerX+=(headXmag)*(-1);
-      }else{
-         head->vector->centerX+=headXmag;
-      }
+    // 1. head moves along its direction
+    struct Vector2* h = snake->head->vector;
+    h->centerX += h->xUnit_dir * speed;
+    h->centerY += h->yUnit_dir * speed;
 
-      int headYmag=(speed)*(head->vector->yUnit_dir*head->vector->yUnit_dir);
-      if(head->vector->yUnit_dir<=0){
-         head->vector->centerY+=(headYmag)*(-1);
-      }else{
-          head->vector->centerY+=headYmag;
-      }
-      //NOTE: keep heads direction
-     struct  SnakeNode* part=head->next;
-      while (part!=NULL)
-      {
-       struct  SnakeNode* before=part->before;
-       //calculate vector between them(each box and  the one  before)
-        int xApart=before->vector->centerX -  part->vector->centerX;
-        int yApart=before->vector->centerY - part->vector->centerY;
-        float length=(float)sqrt(xApart*xApart + yApart*yApart);
-        //find unit vector
-        float xUnit=xApart / length;
-        float yUnit=yApart/length;
-        //parse unit vector
-        part->vector->xUnit_dir=xUnit;
-        part->vector->yUnit_dir=yUnit;
-        //calculate what magntude it will move each direction
-        int dispXM=speed* (xUnit*xUnit);
-        int dispYM=speed*(yUnit*yUnit);
-     
-        if(part->vector->xUnit_dir>=0){
+    // 2. each follower aims at the block before it (already updated)
+    float gap = snake->side_length;
+    for (struct SnakeNode* n = snake->head->next; n != NULL; n = n->next) {
+        struct Vector2* me  = n->vector;
+        struct Vector2* pre = n->before->vector;
 
-            part->vector->centerX+=dispXM;
-        }else{
-            part->vector->centerX+=(dispXM)*(-1);
+        float dx  = pre->centerX - me->centerX;
+        float dy  = pre->centerY - me->centerY;
+        float len = sqrtf(dx * dx + dy * dy);
+        if (len < 0.0001f) continue;          // avoid division by zero
+
+        me->xUnit_dir = dx / len;             // unit vector toward the block before
+        me->yUnit_dir = dy / len;
+
+        float step = len - gap;               // how far to close to restore spacing
+        if (step > 0.0f) {
+            me->centerX += me->xUnit_dir * step;
+            me->centerY += me->yUnit_dir * step;
         }
-        if(part->vector->yUnit_dir>=0){
-
-            part->vector->centerY+=dispYM;
-        }else{
-            part->vector->centerY+=(dispYM)*(-1);
-        }
-        part=part->next;
-      }
-               
-            
+    }
 }
 
 void addBox(struct Snake *snake)
@@ -178,9 +148,21 @@ void addBox(struct Snake *snake)
             puts("it failed to allocate vector for new node to add");
             free(node);
         }else{
-            //i will do this later after snake view, move, change direction
-
-
+            struct SnakeNode* tail=snake->tail;
+            //copy data from tail to vector
+            vector->centerX=tail->vector->centerX;
+            vector->centerY=tail->vector->centerY;
+            vector->xUnit_dir=tail->vector->xUnit_dir;
+            vector->yUnit_dir=tail->vector->yUnit_dir;
+            //point nodes vector to that vector
+            node->vector=vector;
+            //make tail its next
+            tail->next=node;
+            //make node before as current tail
+            node->before=tail;
+            node->next=NULL;
+            //assign tail
+            snake->tail=node;
         }
 
         
