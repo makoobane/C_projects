@@ -2,11 +2,16 @@
 #include <stdlib.h>
 #include <math.h>
 #include <stdbool.h>
+#include <time.h>
+
 #include <stdint.h>
 #include <SDL2/SDL.h>
 
 #include "snake.h"
+#include "mouse.h"
 
+#define MOUSE_RADIUS 50
+#define SNAKE_RADIUS 40
 #define TITLE "SNAKE GAME"
 int width=-1;
 int height=-1;
@@ -27,18 +32,29 @@ float speed;
 enum Starting start;
 struct SnakeDirection direction;
 int snakelength;
+//mouse
+struct Mouse* mouse;
 }Game;
 bool Init_SDL(Game* game);
-void createSnakeAt(Game* game,uint8_t size,int posx, int posy);
-void fillCircle(SDL_Renderer* r, int cx, int cy, int radius);
+void createSnakeAt(Game* game,int posx, int posy);
+void fillCircle(SDL_Renderer* r, int x, int y, int radius);
 void drawSnake(Game* game);
 void moveSnake(Game* game);
 void changeSnakeDirection(Game* game);
-void eat(Game* game);
+//create mouse
+void createMouseWithSize(Game* game,uint8_t size);
+void showMouse(Game* game);
+void killMouse(Game* game);
+//eat mouse
+bool doesSnakeBitenMouse(Game* game);
+void eatMouse(Game* game);
+//end game and clean
 void destroyGame(Game* game,int exit_code);
 int main(){
+    srand(time(NULL));
     Game _={
-        .snakelength=3,
+        .mouse=NULL,
+        .snakelength=0,
         .direction={.xDir=-1.0,.yDir=0.0},
         .start=STOP,
         .speed=3.0,
@@ -48,7 +64,10 @@ int main(){
         Game* game=&_;
         bool successINit=Init_SDL(game);
         if(successINit){
-        createSnakeAt(game,40,800,200);
+        //create snake
+        createSnakeAt(game,800,200);
+        //create mouse initially
+        createMouseWithSize(game,MOUSE_RADIUS);
         bool running=true;
        while (running)
        {
@@ -65,9 +84,6 @@ int main(){
                 {
                     case SDL_SCANCODE_X:
                         running=false;
-                        break;
-                    case SDL_SCANCODE_E://for testing
-                        eat(game);
                         break;
                     case SDL_SCANCODE_SPACE:
                         if(game->start==START){
@@ -106,6 +122,7 @@ int main(){
          moveSnake(game);
          SDL_SetRenderDrawColor(game->renderer,40,40,40,0);
          SDL_RenderClear(game->renderer);
+         showMouse(game);
          drawSnake(game);
          SDL_RenderPresent(game->renderer);
          SDL_Delay(16);
@@ -122,7 +139,7 @@ int main(){
 
 bool Init_SDL(Game *game)
 {
-    int init_sdlError=SDL_Init(SDL_INIT_EVERYTHING);
+    int init_sdlError=SDL_Init(SDL_INIT_VIDEO);
     if(init_sdlError!=0){
         fprintf(stderr,"error at init sdl:%s\n",SDL_GetError());
         return false;
@@ -151,27 +168,32 @@ bool Init_SDL(Game *game)
     return true;
 }
 
-void createSnakeAt(Game *game,uint8_t size,int posx, int posy)
+void createSnakeAt(Game *game,int posx, int posy)
 {
-    struct Snake* snake=createSmallSnake(size,posx,posy);
-    game->snake=snake;
+    struct Snake* snake=createSmallSnake(SNAKE_RADIUS,posx,posy);
+    if(snake==NULL){
+        puts("failed to create snake");
+    }else{
+        game->snakelength=3;
+        game->snake=snake;
+    }
 
 }
-void fillCircle(SDL_Renderer* r, int cx, int cy, int radius)
+void fillCircle(SDL_Renderer* r, int x, int y, int radius)
 {
     for (int dy = -radius; dy <= radius; dy++) {
         int dx = (int)sqrtf((float)(radius * radius - dy * dy));
-        SDL_RenderDrawLine(r, cx - dx, cy + dy, cx + dx, cy + dy);
+        SDL_RenderDrawLine(r, x - dx, y + dy, x + dx, y + dy);
     }
 }
 
 void drawSnake(Game *game)
 {
    
-    int MaxRadius = (int)(game->snake->side_length * 0.6f);
+    int MaxRadius = (int)(game->snake->side_length*0.6f);
     int i=0;
     for (struct SnakeNode* n = game->snake->head; n != NULL; n = n->next) {
-        int radius=MaxRadius*(1.0 - (0.1*i)/game->snakelength);
+        int radius=MaxRadius*(1.0 - (0.3*i)/game->snakelength);
         if (n == game->snake->head){
             SDL_SetRenderDrawColor(game->renderer, 2, 10, 10, 255);
             
@@ -191,6 +213,13 @@ void moveSnake(Game *game)
 {
     if(game->start==START){
         move(game->snake,game->speed);
+        bool mouseBitten=doesSnakeBitenMouse(game);
+        if(mouseBitten){
+            killMouse(game);
+            eatMouse(game);
+            createMouseWithSize(game,MOUSE_RADIUS);
+        }
+        
     }
 }
 
@@ -201,17 +230,50 @@ void changeSnakeDirection(Game *game)
     }
 }
 
-void eat(Game *game)
+void createMouseWithSize(Game* game,uint8_t size)
+{
+    struct Mouse* mouse=createMouseAtRandomPositionIn(width,height,size);
+    if(mouse!=NULL){
+        game->mouse=mouse;
+    }else{
+        puts("error on creating mouse");
+    }
+}
+
+void showMouse(Game *game)
+{
+    if(game->mouse!=NULL){
+        SDL_SetRenderDrawColor(game->renderer,100,250,40,255);
+        fillCircle(game->renderer,game->mouse->xPosition,game->mouse->yPosition,game->mouse->size);
+    }
+}
+
+void killMouse(Game *game)
+{
+    destroyMouse(game->mouse);
+    game->mouse=NULL;
+}
+bool doesSnakeBitenMouse(Game *game)
+{
+    if (game->mouse == NULL) return false;
+    float headR = game->snake->side_length * 0.6f;
+    float minDist = game->mouse->size + headR;
+    float dx = game->mouse->xPosition - game->snake->head->vector->centerX;
+    float dy = game->mouse->yPosition - game->snake->head->vector->centerY;
+    return dx * dx + dy * dy <= minDist * minDist;
+}
+
+void eatMouse(Game *game)
 {
     if(game->start==START){
         game->snakelength+=1;
         addBox(game->snake);
-
     }
 }
 
 void destroyGame(Game *game,int exit_code)
 {
+    destroyMouse(game->mouse);
     destroySnake(game->snake);
     SDL_DestroyRenderer(game->renderer);
     SDL_DestroyWindow(game->window);
