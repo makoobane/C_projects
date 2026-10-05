@@ -14,7 +14,7 @@
 #define MOUSE_RADIUS 50
 #define SNAKE_RADIUS 40
 #define TITLE "SNAKE GAME"
-#define MIXER_FLAG MIX_INIT_WAVPACK
+#define MIXER_FLAG MIX_INIT_OGG
 int width=-1;
 int height=-1;
 enum Starting{
@@ -38,6 +38,7 @@ int snakelength;
 struct Mouse* mouse;
 //sound
 Mix_Chunk* eatSound;
+Mix_Music* music;
 }Game;
 bool Init_SDL(Game* game);
 void createSnakeAt(Game* game,int posx, int posy);
@@ -52,12 +53,14 @@ void killMouse(Game* game);
 //eat mouse
 bool doesSnakeBitenMouse(Game* game);
 void eatMouse(Game* game);
+//music
+void playmusic(Game* game);
 //end game and clean
 void destroyGame(Game* game,int exit_code);
 int main(){
     srand(time(NULL));
     Game _={
-        
+        .music=NULL,
         .eatSound=NULL,
         .mouse=NULL,
         .snakelength=0,
@@ -74,6 +77,8 @@ int main(){
         createSnakeAt(game,800,200);
         //create mouse initially
         createMouseWithSize(game,MOUSE_RADIUS);
+        //play music
+        playmusic(game);
         bool running=true;
        while (running)
        {
@@ -94,8 +99,12 @@ int main(){
                     case SDL_SCANCODE_SPACE:
                         if(game->start==START){
                             game->start=STOP;
+                            Mix_PauseMusic();
                         }else{
                             game->start=START;
+                            if(Mix_PausedMusic()){
+                                Mix_ResumeMusic();
+                            }
                         }
                         break;
                     case SDL_SCANCODE_LEFT:
@@ -171,12 +180,12 @@ bool Init_SDL(Game *game)
         fprintf(stderr,"error at renderer ceation:%s\n",SDL_GetError());
         return false;
     }
-    // //init mixer
-    // int mixflag= Mix_Init(MIXER_FLAG);
-    // if((mixflag&MIXER_FLAG) !=MIXER_FLAG){
-    //     fprintf(stderr,"error on mixer init:%s\n",Mix_GetError());
-    //     return false;
-    // }
+    //init mixer
+    int mixflag= Mix_Init(MIXER_FLAG);
+    if((mixflag&MIXER_FLAG) !=MIXER_FLAG){
+        fprintf(stderr,"error on mixer init:%s\n",Mix_GetError());
+        return false;
+    }
     //openAudio
     int errAudio=Mix_OpenAudio(44100, MIX_DEFAULT_FORMAT, 2, 2048);
     if(errAudio!=0){
@@ -187,6 +196,11 @@ bool Init_SDL(Game *game)
     game->eatSound=Mix_LoadWAV("eat.wav");
     if(game->eatSound==NULL){
         fprintf(stderr,"error on load wav file:%s\n",Mix_GetError());
+        return false;
+    }
+    game->music=Mix_LoadMUS("hees.ogg");
+    if(game->music==NULL){
+        fprintf(stderr,"error on load music file:%s\n",Mix_GetError());
         return false;
     }
     return true;
@@ -296,12 +310,23 @@ void eatMouse(Game *game)
     }
 }
 
+void playmusic(Game* game)
+{
+    //play background music
+    int perr=Mix_PlayMusic(game->music,-1);//-1 means loop infinitely
+    if(perr){
+        fprintf(stderr,"music play of the background failed:%s\n",Mix_GetError());
+    }
+}
+
 void destroyGame(Game *game,int exit_code)
 {
+    Mix_HaltMusic();
     Mix_HaltChannel(-1);
+    Mix_FreeMusic(game->music);
     Mix_FreeChunk(game->eatSound);
     Mix_CloseAudio();
-    // Mix_Quit();
+    Mix_Quit();
 
     destroyMouse(game->mouse);
     destroySnake(game->snake);
