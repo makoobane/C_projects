@@ -6,7 +6,7 @@
 FILE* createFilePointer(const char* filename);
 uint32_t read4bytes(FILE* fptr);
 uint16_t read2bytes(FILE* fptr);
-char* bigEndianToAscii(uint32_t fourBytes);
+char* bigEndianToString(uint32_t fourBytes);
 void closeFile(FILE* fptr);
 int main(){
     //set up file pointer
@@ -15,26 +15,26 @@ int main(){
     //read Riff 4bytes
     uint32_t RiffBytes=read4bytes(fptr);
     //convert big endian to Ascii
-    char* RiffString=bigEndianToAscii(RiffBytes);
+    char* RiffString=bigEndianToString(RiffBytes);
     printf("%s\n",RiffString);
     free(RiffString);
     //read size
     uint32_t wholeFileSize=read4bytes(fptr);
-    printf("%d\n",wholeFileSize);
+    printf("whole file size:%d\n",wholeFileSize);
     //read "WAVE" fourbytes
     uint32_t waveBytes=read4bytes(fptr);
-    char* waveString=bigEndianToAscii(waveBytes);
+    char* waveString=bigEndianToString(waveBytes);
     printf("%s\n",waveString);
     free(waveString);
     //read "fmt " string fourbytes
     uint32_t fmtBytes=read4bytes(fptr);
-    char* fmtString=bigEndianToAscii(fmtBytes);
+    char* fmtString=bigEndianToString(fmtBytes);
     printf("%s\n",fmtString);
     free(fmtString);
     //read subchunk1Size fourbytes of litte Endian
     uint32_t subchunk1Size=read4bytes(fptr);
     //I have noticed that little Endian is inverted here and read correctly
-    printf("subchunk1Size:%d\n",subchunk1Size);//it is 406248
+    printf("subchunk1Size:%d\n",subchunk1Size);//it is 406284
     //read audio format
     uint16_t audioFormat=read2bytes(fptr);
     printf("audioFormat:%d\n",audioFormat);//it read 1 PCM
@@ -55,14 +55,12 @@ int main(){
     printf("bits per sample is:%d\n",bitsPerSample);//it is 16bits per sample
     //read "data"
     uint32_t dataBytes=read4bytes(fptr);
-    char* dataString=bigEndianToAscii(dataBytes);
+    char* dataString=bigEndianToString(dataBytes);
     printf("%s\n",dataString);
     free(dataString);
     //read subchunk2Size of actuall data size to expect
     uint32_t actualDataSize=read4bytes(fptr);
-    printf("actual data size or subchunk2Size is :%d\n",actualDataSize);// it is 406248, but why it is same as subchunk1Size??
-
-
+    printf("actual data size or subchunk2Size is :%d\n",actualDataSize);// it is 406248
 
 
     //close file
@@ -100,7 +98,7 @@ uint16_t read2bytes(FILE *fptr)
     return twobytes;
 }
 
-char *bigEndianToAscii(uint32_t fourBytes)
+char *bigEndianToString(uint32_t fourBytes)
 {
     char* fourLetters=malloc(5);
     fourLetters[3] = (fourBytes >> 24) & 0xFF; 
