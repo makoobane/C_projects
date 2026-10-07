@@ -1,8 +1,24 @@
 #include <stdio.h>
 #include <stdint.h>
-
+#include <stdbool.h>
 #include <stdlib.h>
+#include <SDL2/SDL.h>
 
+#define TITLE "AudioViewer"
+
+int width=-1;
+int height=-1;
+typedef struct Screen{
+SDL_Window* window;
+SDL_Renderer* renderer;
+}Screen;
+
+typedef void (*MySDL_runCallbackFunction)(void*);
+//sdl things
+bool init_SDL(Screen* screen);
+void run(MySDL_runCallbackFunction myFunctions[],int howmanyFunctions,Screen* screen);
+void destroySDL(Screen* screen,int exit_code);
+//file things
 FILE* createFilePointer(const char* filename);
 uint32_t read4bytes(FILE* fptr);
 uint16_t read2bytes(FILE* fptr);
@@ -63,9 +79,81 @@ int main(){
     printf("actual data size or subchunk2Size is :%d\n",actualDataSize);// it is 406248
 
 
+
     //close file
     closeFile(fptr);
+
+    //DISPLAYING part
+    Screen _={
+  .window=NULL,
+  .renderer=NULL,
+    };
+    Screen* screen=&_;
+    SDL_Init(screen);
     return 0;
+}
+
+bool init_SDL(Screen* screen)
+{
+ int sdlinitERr= SDL_Init(SDL_INIT_VIDEO);
+ if(sdlinitERr!=0){
+    fprintf(stderr,"error on sdl init:%s\n",SDL_GetError());
+    return false;
+}
+SDL_DisplayMode display;
+SDL_GetDesktopDisplayMode(-1,&display);
+width=display.w;
+height=display.h;
+
+screen->window=SDL_CreateWindow(TITLE,SDL_WINDOWPOS_CENTERED,SDL_WINDOWPOS_CENTERED,width,height,0);
+if(screen->window==NULL){
+    fprintf(stderr,"error on sdl window creation:%s\n",SDL_GetError());
+    return false;
+    
+}
+screen->renderer=SDL_CreateRenderer(screen->window,-1,0);
+if(screen->renderer==NULL){
+     fprintf(stderr,"error on sdl window creation:%s\n",SDL_GetError());
+     return false;
+ }
+ return true;
+}
+
+void run(MySDL_runCallbackFunction myFunctions[], int howmanyFunctions,Screen* screen)
+{
+    bool runinig=true;
+    while (runinig)
+    {
+        SDL_Event event;
+        while (SDL_PollEvent(&event))
+        {
+            switch (event.type)
+            {
+            case SDL_QUIT:
+                destroySDL(screen,EXIT_SUCCESS);
+                break;
+            
+            default:
+                break;
+            }
+            
+        }
+        SDL_RenderClear(screen->renderer);
+        for(int i=0;i<howmanyFunctions;i++){
+            // myFunctions[i]();
+        }
+        SDL_RenderPresent(screen->renderer);
+        SDL_Delay(33);
+    }
+    
+}
+
+void destroySDL(Screen *screen,int exit_code)
+{
+    SDL_DestroyRenderer(screen->renderer);
+    SDL_DestroyWindow(screen->window);
+    SDL_Quit();
+    exit(exit_code);
 }
 
 FILE *createFilePointer(const char *filename)
