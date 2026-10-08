@@ -8,21 +8,34 @@
 
 int width=-1;
 int height=-1;
+struct MimAndMax{
+    int16_t min;
+    int16_t max;
+};
 typedef struct Screen{
 SDL_Window* window;
 SDL_Renderer* renderer;
+float scaleOfDecibelsInPixel;
+uint32_t numberOfSamples;//size of alll data
+uint16_t sizeOfBlock;//how many 2bytes of subchunk2size
+int16_t* block;
 }Screen;
 
-typedef void (*MySDL_runCallbackFunction)(void*);
-//sdl things
-bool init_SDL(Screen* screen);
-void run(MySDL_runCallbackFunction myFunctions[],int howmanyFunctions,Screen* screen);
-void destroySDL(Screen* screen,int exit_code);
+
 //file things
 FILE* createFilePointer(const char* filename);
 uint32_t read4bytes(FILE* fptr);
 uint16_t read2bytes(FILE* fptr);
+int16_t read2bytesOfData(FILE *fptr);
 char* bigEndianToString(uint32_t fourBytes);
+//sdl things
+bool init_SDL(Screen* screen);
+struct MimAndMax findMinAndMax(uint16_t sizeOfBlock,int16_t* block);
+void drawMinAndMaxLine(SDL_Renderer* renderer,int xstart, int xend,struct MimAndMax minAndMax);
+void readBlocksAndDrawIt(FILE* fptr,Screen* screen,int xposition);
+void run(FILE* fptr,Screen* screen);
+void destroySDL(Screen* screen,int exit_code);
+//close file
 void closeFile(FILE* fptr);
 int main(){
     //set up file pointer
@@ -80,16 +93,22 @@ int main(){
 
 
 
-    //close file
-    closeFile(fptr);
-
+    
     //DISPLAYING part
     Screen _={
-  .window=NULL,
-  .renderer=NULL,
+        .window=NULL,
+        .renderer=NULL,
+        .scaleOfDecibelsInPixel=0.0,
+        .sizeOfBlock=0,
+        .numberOfSamples=actualDataSize/(blockAlign),
+        .block=NULL,
     };
     Screen* screen=&_;
-    SDL_Init(screen);
+    init_SDL(screen);
+
+    run(fptr,screen);
+    //close file
+    closeFile(fptr);
     return 0;
 }
 
@@ -100,10 +119,17 @@ bool init_SDL(Screen* screen)
     fprintf(stderr,"error on sdl init:%s\n",SDL_GetError());
     return false;
 }
+//screen
 SDL_DisplayMode display;
-SDL_GetDesktopDisplayMode(-1,&display);
+ int mode_error= SDL_GetDesktopDisplayMode(0,&display);
+if(mode_error!=0){
+    fprintf(stderr,"error at size fetching:%s\n",SDL_GetError());
+    return false;
+}
 width=display.w;
 height=display.h;
+
+
 
 screen->window=SDL_CreateWindow(TITLE,SDL_WINDOWPOS_CENTERED,SDL_WINDOWPOS_CENTERED,width,height,0);
 if(screen->window==NULL){
@@ -116,35 +142,73 @@ if(screen->renderer==NULL){
      fprintf(stderr,"error on sdl window creation:%s\n",SDL_GetError());
      return false;
  }
+ //set white color as background
+ SDL_SetRenderDrawColor(screen->renderer,255,255,255,255);
+ 
+
+ //how many decibels per pixel
+ screen->scaleOfDecibelsInPixel=(float)65536/height;
+ //size of chunk per pixel in width
+ screen->sizeOfBlock=(uint16_t)screen->numberOfSamples/width;
+ //block storage
+ screen->block=calloc(screen->sizeOfBlock,sizeof(int16_t));
+ if(screen->block==NULL){
+    puts("failed to allocate bucket of sounds those needed to draw in a pixel");
+    return false;
+ }
  return true;
 }
 
-void run(MySDL_runCallbackFunction myFunctions[], int howmanyFunctions,Screen* screen)
+struct MimAndMax findMinAndMax(uint16_t sizeOfBlock,int16_t* block)
 {
-    bool runinig=true;
-    while (runinig)
-    {
-        SDL_Event event;
-        while (SDL_PollEvent(&event))
-        {
-            switch (event.type)
-            {
-            case SDL_QUIT:
-                destroySDL(screen,EXIT_SUCCESS);
-                break;
-            
-            default:
-                break;
-            }
-            
-        }
+    struct MimAndMax minAndMax;
+    int16_t min=block[0];
+    int16_t max=block[0];
+    for(int i=0;i<sizeOfBlock;i++){
+      int16_t currentamplitude= block[i];
+      if(currentamplitude>max){
+        max=currentamplitude;
+      }
+      if(currentamplitude<min){
+        min=currentamplitude;
+      }
+    }
+    minAndMax.max=max;
+    minAndMax.min=min;
+    return minAndMax;
+}
+
+void drawMinAndMaxLine(SDL_Renderer* renderer,int xstart, int xend,struct MimAndMax minAndMax)
+{
+   SDL_SetRenderDrawColor(renderer,0,0,255,255);
+   SDL_RenderDrawLine(renderer,xstart,minAndMax.min,xend,minAndMax.max+minAndMax.min);
+}
+
+void readBlocksAndDrawIt(FILE *fptr,Screen* screen,int xposition)
+{
+    for(int j=0;j<screen->sizeOfBlock;j++){
+        int16_t twodbytesofData=read2bytesOfData(fptr);
+        screen->block[j]=twodbytesofData;
+    }
+    //find min and max
+    struct MimAndMax minAndMax=findMinAndMax(screen->sizeOfBlock,screen->block);
+    //scale min and max
+    minAndMax.max/=screen->scaleOfDecibelsInPixel;
+    minAndMax.min/=screen->scaleOfDecibelsInPixel;
+    //draw it
+    drawMinAndMaxLine(screen->renderer,xposition,xposition+1,minAndMax);
+}
+
+void run(FILE* fptr,Screen* screen)
+{      
+
         SDL_RenderClear(screen->renderer);
-        for(int i=0;i<howmanyFunctions;i++){
-            // myFunctions[i]();
+        for(int m=0;m<width;m++){
+            readBlocksAndDrawIt(fptr,screen,m);
         }
         SDL_RenderPresent(screen->renderer);
-        SDL_Delay(33);
-    }
+        SDL_Delay(3300);
+    
     
 }
 
@@ -184,6 +248,15 @@ uint16_t read2bytes(FILE *fptr)
         printf("i had read thosse two bytes:0x%04X\n",twobytes);
     }   
     return twobytes;
+}
+int16_t read2bytesOfData(FILE *fptr)
+{
+    int16_t twobytes;
+    size_t howmanyTwobytesIread=fread(&twobytes,sizeof(int16_t),1,fptr);
+    if(howmanyTwobytesIread==1){
+        return twobytes;
+    }   
+
 }
 
 char *bigEndianToString(uint32_t fourBytes)
