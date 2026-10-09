@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <stdint.h>
+#include <math.h>
 #include <stdbool.h>
 #include <stdlib.h>
 #include <SDL2/SDL.h>
@@ -8,16 +9,17 @@
 
 int width=-1;
 int height=-1;
-struct MimAndMax{
+struct SoundBlockData{
     int16_t min;
     int16_t max;
+    float rms;
 };
 typedef struct Screen{
 SDL_Window* window;
 SDL_Renderer* renderer;
 float scaleOfDecibelsInPixel;
 uint32_t numberOfSamples;//size of alll data
-uint16_t sizeOfBlock;//how many 2bytes of subchunk2size
+uint32_t sizeOfBlock;//how many 2bytes of subchunk2size
 int16_t* block;
 }Screen;
 
@@ -26,12 +28,11 @@ int16_t* block;
 FILE* createFilePointer(const char* filename);
 uint32_t read4bytes(FILE* fptr);
 uint16_t read2bytes(FILE* fptr);
-int16_t read2bytesOfData(FILE *fptr);
 char* bigEndianToString(uint32_t fourBytes);
 //sdl things
 bool init_SDL(Screen* screen);
-struct MimAndMax findMinAndMax(uint16_t sizeOfBlock,int16_t* block);
-void drawMinAndMaxLine(SDL_Renderer* renderer,int xstart, int xend,struct MimAndMax minAndMax);
+struct SoundBlockData findSoundBlocData(uint16_t sizeOfBlock,int16_t* block);
+void drawSoundBlockData(SDL_Renderer* renderer,int xstart, int xend,struct SoundBlockData SoundBlockData);
 void readBlocksAndDrawIt(FILE* fptr,Screen* screen,int xposition);
 void run(FILE* fptr,Screen* screen);
 void destroySDL(Screen* screen,int exit_code);
@@ -142,14 +143,13 @@ if(screen->renderer==NULL){
      fprintf(stderr,"error on sdl window creation:%s\n",SDL_GetError());
      return false;
  }
- //set white color as background
- SDL_SetRenderDrawColor(screen->renderer,255,255,255,255);
+
  
 
  //how many decibels per pixel
  screen->scaleOfDecibelsInPixel=(float)65536/height;
  //size of chunk per pixel in width
- screen->sizeOfBlock=(uint16_t)screen->numberOfSamples/width;
+ screen->sizeOfBlock=screen->numberOfSamples/width;
  //block storage
  screen->block=calloc(screen->sizeOfBlock,sizeof(int16_t));
  if(screen->block==NULL){
@@ -159,11 +159,12 @@ if(screen->renderer==NULL){
  return true;
 }
 
-struct MimAndMax findMinAndMax(uint16_t sizeOfBlock,int16_t* block)
+struct SoundBlockData findSoundBlocData(uint16_t sizeOfBlock,int16_t* block)
 {
-    struct MimAndMax minAndMax;
+    struct SoundBlockData soundblockData;
     int16_t min=block[0];
     int16_t max=block[0];
+    uint64_t sum=0;
     for(int i=0;i<sizeOfBlock;i++){
       int16_t currentamplitude= block[i];
       if(currentamplitude>max){
@@ -172,48 +173,70 @@ struct MimAndMax findMinAndMax(uint16_t sizeOfBlock,int16_t* block)
       if(currentamplitude<min){
         min=currentamplitude;
       }
+      sum+=(uint64_t)currentamplitude*currentamplitude;
     }
-    minAndMax.max=max;
-    minAndMax.min=min;
-    return minAndMax;
+    soundblockData.max=max;
+    soundblockData.min=min;
+    soundblockData.rms=sqrtf((float)sum/sizeOfBlock);
+    // printf("rms is %.2f\n",soundblockData.rms);
+    return soundblockData;
 }
 
-void drawMinAndMaxLine(SDL_Renderer* renderer,int xstart, int xend,struct MimAndMax minAndMax)
+void drawSoundBlockData(SDL_Renderer* renderer,int xstart, int xend,struct SoundBlockData soundBlockData)
 {
-   SDL_SetRenderDrawColor(renderer,0,0,255,255);
-   SDL_RenderDrawLine(renderer,xstart,minAndMax.min,xend,minAndMax.max+minAndMax.min);
+   SDL_SetRenderDrawColor(renderer,0,0,155,15);
+   int center=height/2;
+   int min=center+soundBlockData.min;
+   int max=center-soundBlockData.max;
+   SDL_RenderDrawLine(renderer,xstart,min,xend,max);
+   //draw rms 
+   SDL_SetRenderDrawColor(renderer,0,255,0,255);
+   int rms=(int)soundBlockData.rms+height/4;
+   SDL_RenderDrawLine(renderer,xstart,rms,xstart+1,rms);// it requires reading current pixel and next pixel to draw valid line??!!
+   
 }
 
 void readBlocksAndDrawIt(FILE *fptr,Screen* screen,int xposition)
 {
-    for(int j=0;j<screen->sizeOfBlock;j++){
-        int16_t twodbytesofData=read2bytesOfData(fptr);
-        screen->block[j]=twodbytesofData;
-    }
-    //find min and max
-    struct MimAndMax minAndMax=findMinAndMax(screen->sizeOfBlock,screen->block);
+    //reading alll of the file is somehting that iam avoiding it bcs this one is small 4s . what if i use to test several minutes audio
+    //more general and consistant is needed. tell me if there is better way(claude)
+    size_t howmany= fread(screen->block,sizeof(int16_t),screen->sizeOfBlock,fptr);
+    // printf("%zu\n",howmany);//why it retruns 3, every time?
+    //find min and max and rms
+    struct SoundBlockData soundBlockData=findSoundBlocData(screen->sizeOfBlock,screen->block);
     //scale min and max
-    minAndMax.max/=screen->scaleOfDecibelsInPixel;
-    minAndMax.min/=screen->scaleOfDecibelsInPixel;
+    soundBlockData.max/=screen->scaleOfDecibelsInPixel;
+    soundBlockData.min/=screen->scaleOfDecibelsInPixel;
+    soundBlockData.rms/=screen->scaleOfDecibelsInPixel;
     //draw it
-    drawMinAndMaxLine(screen->renderer,xposition,xposition+1,minAndMax);
+    drawSoundBlockData(screen->renderer,xposition,xposition,soundBlockData);
 }
 
 void run(FILE* fptr,Screen* screen)
 {      
 
+
+         //set white color as background
+        SDL_SetRenderDrawColor(screen->renderer,255,255,255,255);
         SDL_RenderClear(screen->renderer);
+        //render sound 
         for(int m=0;m<width;m++){
             readBlocksAndDrawIt(fptr,screen,m);
         }
+        //show horizontal line
+        SDL_SetRenderDrawColor(screen->renderer,250,0,0,255);
+        SDL_RenderDrawLine(screen->renderer,0,height/2,width,height/2);
+        //present
         SDL_RenderPresent(screen->renderer);
-        SDL_Delay(3300);
+        SDL_Delay(4000);
+
     
     
 }
 
 void destroySDL(Screen *screen,int exit_code)
 {
+    free(screen->block);
     SDL_DestroyRenderer(screen->renderer);
     SDL_DestroyWindow(screen->window);
     SDL_Quit();
@@ -249,15 +272,7 @@ uint16_t read2bytes(FILE *fptr)
     }   
     return twobytes;
 }
-int16_t read2bytesOfData(FILE *fptr)
-{
-    int16_t twobytes;
-    size_t howmanyTwobytesIread=fread(&twobytes,sizeof(int16_t),1,fptr);
-    if(howmanyTwobytesIread==1){
-        return twobytes;
-    }   
 
-}
 
 char *bigEndianToString(uint32_t fourBytes)
 {
