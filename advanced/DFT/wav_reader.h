@@ -2,7 +2,7 @@
 #define WAV_FILE_READER_H
 
 #include <stdint.h>
-typedef struct WavFileHeader{
+typedef struct WV_WavFileHeader{
  //Riff chunk descriptor   
 uint32_t chunkID;
 uint32_t cunkSize;
@@ -19,10 +19,11 @@ uint16_t bitsperSample;
 //data subchunk
 uint32_t subchunk2ID;
 uint32_t subchunk2Size;
-}WavFileHeader;
+}WV_WavFileHeader;
 
-WavFileHeader* readWavFileHeader(const char* filename);
-char* bigEndianToString(uint32_t fourBytes);
-
-void printWavHeader(WavFileHeader* header);
+WV_WavFileHeader* WV_readWavFileHeader(const char* filename);
+char* WV_bigEndianToString(uint32_t fourBytes);
+void WV_printWavHeader(WV_WavFileHeader* header);
+void WV_printData(const char* filename);
+void WV_destroyWAVFileHeader(WV_WavFileHeader* header);
 #endif
