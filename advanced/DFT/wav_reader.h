@@ -20,10 +20,16 @@ uint16_t bitsperSample;
 uint32_t subchunk2ID;
 uint32_t subchunk2Size;
 }WV_WavFileHeader;
-
+//read header
 WV_WavFileHeader* WV_readWavFileHeader(const char* filename);
+//convert big Endian uint32_t to string
 char* WV_bigEndianToString(uint32_t fourBytes);
+//print header
 void WV_printWavHeader(WV_WavFileHeader* header);
-void WV_printData(const char* filename);
+//print whole files data
+void WV_printData(const char* filename,uint32_t subchunk2Size);
+//visualize file data
+void WV_ViewWavFileDataMinAndMax(const char* filename);
+//destroy wav file header freeing
 void WV_destroyWAVFileHeader(WV_WavFileHeader* header);
 #endif

@@ -1,7 +1,11 @@
 #include <stdio.h>
 #include <stdint.h>
 #include <stdlib.h>
+#include <stdbool.h>
 #include <string.h>
+
+#include <SDL2/SDL.h>
+
 #include "wav_reader.h"
 
 WV_WavFileHeader* WV_readWavFileHeader(const char *filename)
@@ -63,19 +67,28 @@ char* WV_bigEndianToString(uint32_t fourBytes)
 
 void WV_printWavHeader(WV_WavFileHeader *header)
 {
-    printf("WAVFILE HEADER:{chunkID:%s,\nchunk1Size:%d,\nformat:%s,\nsubchunk1ID:%s,\nsubchunk1Size:%d,\naudioFormat:%d,\nnumChannels:%d,\nsampleRate:%d,\nbyteRate:%d,\nblockAlign:%d,\nbitsperSample:%d,\nsubchunk2ID:%s,\nsubchunk2Size:%d}\n",WV_bigEndianToString(header->chunkID),header->cunkSize,WV_bigEndianToString(header->format),WV_bigEndianToString(header->subchunk1ID),header->subchunk1Size,header->audioFormat,header->numChannels,header->sampleRate,header->byteRate,header->blockAlign,header->bitsperSample,WV_bigEndianToString(header->subchunk2ID),header->subchunk2Size);
+    char* Riff=WV_bigEndianToString(header->chunkID);
+    char* wave=WV_bigEndianToString(header->format);
+    char* fmt=WV_bigEndianToString(header->subchunk1ID);
+    char* data=WV_bigEndianToString(header->subchunk2ID);
+    printf("WAVFILE HEADER:{chunkID:%s,\nchunk1Size:%d,\nformat:%s,\nsubchunk1ID:%s,\nsubchunk1Size:%d,\naudioFormat:%d,\nnumChannels:%d,\nsampleRate:%d,\nbyteRate:%d,\nblockAlign:%d,\nbitsperSample:%d,\nsubchunk2ID:%s,\nsubchunk2Size:%d}\n",Riff,header->cunkSize,wave,fmt,header->subchunk1Size,header->audioFormat,header->numChannels,header->sampleRate,header->byteRate,header->blockAlign,header->bitsperSample,data,header->subchunk2Size);
+    free(Riff);
+    free(wave);
+    free(fmt);
+    free(data);
 }
 
-void WV_printData(const char *filename)
+void WV_printData(const char *filename,uint32_t subchunk2Size)
 {
     size_t skipp=44;
+    uint16_t KB=1024;
     FILE *fptr = fopen(filename, "rb");
     if (fptr == NULL) {
         perror("file opening failed");
         return;
     }
     
-    uint16_t* samples=malloc(512*sizeof(uint16_t));
+    int16_t* samples=malloc((KB/2)*sizeof(int16_t));
     if(samples==NULL){
         puts("error on allocation of samples");
         fclose(fptr);
@@ -87,23 +100,79 @@ void WV_printData(const char *filename)
         fclose(fptr);
         return;
     }
+    //alignment of reading
+    uint16_t howmanyKBs;
+    uint16_t remainigPairBytes;
+    howmanyKBs= subchunk2Size/KB;
+    remainigPairBytes=subchunk2Size%KB;
+    remainigPairBytes/=2;
+    printf("howmanykbs:%d, remainingbytes:%d\n",howmanyKBs,remainigPairBytes);
     puts("-----------data starting-----------------------------------------------");
-    size_t howmanyBytesRead = fread(samples, sizeof(uint16_t),512*sizeof(uint16_t), fptr);
-    if(howmanyBytesRead==1024){
-        for(size_t i=0;i<512;i++){
-            if(i==0){
-                printf("data:[%d,",samples[0]);
-            }else if(i==511){
-                printf("%d]\n",samples[i]);
-            }else{
-                printf("%d,",samples[i]);
+    for (size_t kb=0;kb<=howmanyKBs;kb++){
+        fread(samples, sizeof(int16_t),KB/2, fptr);
+            for(size_t i=0;i<(KB/2);i++){
+                if(i==0 && kb==0){
+                    printf("data:[%d,",samples[0]);
+                }else if(kb==howmanyKBs && i==remainigPairBytes){
+                    printf("%d]\n",samples[i]);
+                    break;
+                }else{
+                    printf("%d,",samples[i]);
+                }
             }
-        }
     }
     puts("-----------data Ended-----------------------------------------------");
 
     free(samples);
     fclose(fptr);
+}
+
+void WV_ViewWavFileDataMinAndMax(const char *filename)
+
+{
+    int width=-1;
+    int heigth=-1;
+    int sdlinitError=SDL_Init(SDL_INIT_EVERYTHING);
+    if(sdlinitError!=0){
+        fprintf(stderr,"error on init sdl:%s\n",SDL_GetError());
+        return;
+    }
+    SDL_DisplayMode display;
+    SDL_GetDesktopDisplayMode(0,&display);
+    width=display.w;
+    heigth=display.h;
+    SDL_Window* window=SDL_CreateWindow("View MIN and MAX",SDL_WINDOWPOS_CENTERED,SDL_WINDOWPOS_CENTERED,width, heigth,0);
+    if(window==NULL){
+        fprintf(stderr,"error on window creation:%s\n",SDL_GetError());
+        return;
+    }
+    SDL_Renderer* renderer=SDL_CreateRenderer(window,-1,0);
+    if(renderer==NULL){
+        fprintf(stderr,"error on renderer:%s\n",SDL_GetError());
+        return;
+    }
+    while (true)
+    {
+        SDL_Event event;
+        while (SDL_PollEvent(&event))
+        {
+            switch (event.type)
+            {
+               case SDL_QUIT:
+                SDL_DestroyRenderer(renderer);
+                SDL_DestroyWindow(window);
+                SDL_Quit();
+                break;
+            
+            default:
+                break;
+            }
+        }
+        SDL_RenderClear(renderer);
+        SDL_RenderPresent(renderer);
+        SDL_Delay(60);
+    }
+    
 }
 
 void WV_destroyWAVFileHeader(WV_WavFileHeader *header)
