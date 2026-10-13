@@ -105,7 +105,7 @@ void WV_printData(const char *filename,uint32_t subchunk2Size)
     uint16_t remainigPairBytes;
     howmanyKBs= subchunk2Size/KB;
     remainigPairBytes=subchunk2Size%KB;
-    remainigPairBytes/=2;
+    remainigPairBytes/=sizeof(int16_t);
     printf("howmanykbs:%d, remainingbytes:%d\n",howmanyKBs,remainigPairBytes);
     puts("-----------data starting-----------------------------------------------");
     for (size_t kb=0;kb<=howmanyKBs;kb++){
@@ -127,11 +127,15 @@ void WV_printData(const char *filename,uint32_t subchunk2Size)
     fclose(fptr);
 }
 
+
+
 void WV_ViewWavFileDataMinAndMax(const char *filename)
 
 {
     int width=-1;
     int heigth=-1;
+    const char* TITLE="MIN and MAX of WAV File data Viewer";
+    //sdl inititalization...
     int sdlinitError=SDL_Init(SDL_INIT_EVERYTHING);
     if(sdlinitError!=0){
         fprintf(stderr,"error on init sdl:%s\n",SDL_GetError());
@@ -141,7 +145,7 @@ void WV_ViewWavFileDataMinAndMax(const char *filename)
     SDL_GetDesktopDisplayMode(0,&display);
     width=display.w;
     heigth=display.h;
-    SDL_Window* window=SDL_CreateWindow("View MIN and MAX",SDL_WINDOWPOS_CENTERED,SDL_WINDOWPOS_CENTERED,width, heigth,0);
+    SDL_Window* window=SDL_CreateWindow(TITLE,SDL_WINDOWPOS_CENTERED,SDL_WINDOWPOS_CENTERED,width, heigth,0);
     if(window==NULL){
         fprintf(stderr,"error on window creation:%s\n",SDL_GetError());
         return;
@@ -151,28 +155,99 @@ void WV_ViewWavFileDataMinAndMax(const char *filename)
         fprintf(stderr,"error on renderer:%s\n",SDL_GetError());
         return;
     }
-    while (true)
+    //read data
+    size_t skipp=40;
+    FILE *fptr = fopen(filename, "rb");
+    if (fptr == NULL) {
+        perror("file opening failed");
+        return;
+    }
+    if(fseek(fptr,skipp,SEEK_SET)!=0){
+        puts("seeking failed");
+        fclose(fptr);
+        return;
+    }
+    uint32_t dataSize;
+    size_t dataSizeReadIs= fread(&dataSize,1,sizeof(uint32_t),fptr);
+    if(dataSizeReadIs!=4){
+        printf("failed to read file data size,%zu\n",dataSizeReadIs);
+        fclose(fptr);
+        return;
+    }
+    printf("data size is:%d bytes\n",dataSize);
+    int numberOfSamples=(dataSize/sizeof(int16_t));
+    printf("number of samples where each is 16bits is :%d and width is:%d\n",numberOfSamples,width);
+    int samplesPerPixelWidth=numberOfSamples/width;
+    int remainingSamples=numberOfSamples%width;
+    printf("samples in pixel avg was:%d, and remainedSamples was:%d\n",samplesPerPixelWidth,remainingSamples);
+    //distribute the remaining by increasing howmany samples in each pixel then some pixels of width would be jobless
+    samplesPerPixelWidth+=1;
+    int drawableWidth=width - (width-remainingSamples)/samplesPerPixelWidth;
+    printf("drawable width:%d\n",drawableWidth);
+    //this is where we store each block of samples to find their min  and max 
+    int16_t* samplesBlock=calloc(samplesPerPixelWidth,sizeof(int16_t));
+    //this is where we will store min and max for each drawablewidth
+    int16_t* maxAndMinOfEachBlockSamples=calloc(drawableWidth*2,sizeof(int16_t));
+    //read each block , find min and max and store them in "maxAndMinOfEachBlockSamples" array
+    for(int pixel=0;pixel<drawableWidth;pixel++){
+      size_t bytesRead= fread(samplesBlock,1,samplesPerPixelWidth*sizeof(int16_t),fptr);
+      if(bytesRead==samplesPerPixelWidth*sizeof(int16_t)){
+        //find min and max
+        int16_t min=samplesBlock[0];
+        int16_t max=samplesBlock[0];
+        for(int i=0;i<samplesPerPixelWidth;i++){
+            if(samplesBlock[i]>max){
+                max=samplesBlock[i];
+            }
+            if(samplesBlock[i]<min){
+                min=samplesBlock[i];
+            }
+        }
+        //store min and max min and max array
+        maxAndMinOfEachBlockSamples[pixel*2]=min;
+        maxAndMinOfEachBlockSamples[pixel*2 + 1]=max;
+      }
+    }
+    free(samplesBlock);
+    samplesBlock=NULL;
+    //prepare to draw "maxAndMinOfEachBlockSamples"
+    int scaleOfLoudnessPerPixel=32768/(heigth/2);
+    int centery=heigth/2;
+    //close file
+    fclose(fptr);
+    //window loop
+    bool running =true;
+    SDL_SetRenderDrawColor(renderer,255,255,255,255);
+    while (running)
     {
         SDL_Event event;
         while (SDL_PollEvent(&event))
         {
             switch (event.type)
             {
-               case SDL_QUIT:
-                SDL_DestroyRenderer(renderer);
-                SDL_DestroyWindow(window);
-                SDL_Quit();
+            case SDL_QUIT:
+                running=false;
                 break;
-            
+           
             default:
                 break;
             }
         }
         SDL_RenderClear(renderer);
+        for(int p=0;p<drawableWidth;p++){
+            SDL_SetRenderDrawColor(renderer,0,0,200,255);//blue
+            int min=maxAndMinOfEachBlockSamples[2*p]/scaleOfLoudnessPerPixel;
+            int max=maxAndMinOfEachBlockSamples[2*p+1]/scaleOfLoudnessPerPixel;
+            SDL_RenderDrawLine(renderer,p,centery+min,p,centery+max);//doubtt
+        }
         SDL_RenderPresent(renderer);
-        SDL_Delay(60);
+        SDL_Delay(160);
+        if(running==false){
+            SDL_DestroyRenderer(renderer);
+            SDL_DestroyWindow(window);
+            SDL_Quit();
+        }
     }
-    
 }
 
 void WV_destroyWAVFileHeader(WV_WavFileHeader *header)
