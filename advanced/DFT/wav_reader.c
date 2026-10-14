@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include <stdbool.h>
 #include <string.h>
+#include <math.h>
 
 #include <SDL2/SDL.h>
 
@@ -184,40 +185,34 @@ void WV_ViewWavFileDataMinAndMax(const char *filename)
     samplesPerPixelWidth+=1;
     int drawableWidth=width - (width-remainingSamples)/samplesPerPixelWidth;
     printf("drawable width:%d\n",drawableWidth);
-    //this is where we store each block of samples to find their min  and max 
+    //this is where we store each block of samples to find their rms value 
     int16_t* samplesBlock=calloc(samplesPerPixelWidth,sizeof(int16_t));
-    //this is where we will store min and max for each drawablewidth
-    int16_t* maxAndMinOfEachBlockSamples=calloc(drawableWidth*2,sizeof(int16_t));
-    //read each block , find min and max and store them in "maxAndMinOfEachBlockSamples" array
+    //this is where we will store rms for each drawablewidth
+    int16_t* rmsOfBlockSamples=calloc(drawableWidth,sizeof(float));
+    //read each block , find rms and store them in "rmsOfBlockSamples" array
     for(int pixel=0;pixel<drawableWidth;pixel++){
       size_t bytesRead= fread(samplesBlock,1,samplesPerPixelWidth*sizeof(int16_t),fptr);
       if(bytesRead==samplesPerPixelWidth*sizeof(int16_t)){
-        //find min and max
-        int16_t min=samplesBlock[0];
-        int16_t max=samplesBlock[0];
+        // find rms and store it
+        int sum=0;
+        float rms=0;
         for(int i=0;i<samplesPerPixelWidth;i++){
-            if(samplesBlock[i]>max){
-                max=samplesBlock[i];
-            }
-            if(samplesBlock[i]<min){
-                min=samplesBlock[i];
-            }
+            sum+=samplesBlock[i];
         }
+        rms=sqrtf((sum/samplesPerPixelWidth)*(sum/samplesPerPixelWidth));
         //store min and max min and max array
-        maxAndMinOfEachBlockSamples[pixel*2]=min;
-        maxAndMinOfEachBlockSamples[pixel*2 + 1]=max;
+        rmsOfBlockSamples[pixel]=rms;
       }
     }
     free(samplesBlock);
     samplesBlock=NULL;
     //prepare to draw "maxAndMinOfEachBlockSamples"
-    int scaleOfLoudnessPerPixel=32768/(heigth/2);
     int centery=heigth/2;
+    int scaleOfLoudnessPerPixel=32768/(centery);
     //close file
     fclose(fptr);
     //window loop
     bool running =true;
-    SDL_SetRenderDrawColor(renderer,255,255,255,255);
     while (running)
     {
         SDL_Event event;
@@ -226,23 +221,25 @@ void WV_ViewWavFileDataMinAndMax(const char *filename)
             switch (event.type)
             {
             case SDL_QUIT:
-                running=false;
-                break;
+            running=false;
+            break;
            
             default:
                 break;
             }
         }
+        
+        SDL_SetRenderDrawColor(renderer,255,255,255,255);
         SDL_RenderClear(renderer);
         for(int p=0;p<drawableWidth;p++){
-            SDL_SetRenderDrawColor(renderer,0,0,200,255);//blue
-            int min=maxAndMinOfEachBlockSamples[2*p]/scaleOfLoudnessPerPixel;
-            int max=maxAndMinOfEachBlockSamples[2*p+1]/scaleOfLoudnessPerPixel;
-            SDL_RenderDrawLine(renderer,p,centery+min,p,centery+max);//doubtt
+            SDL_SetRenderDrawColor(renderer,200,0,200,255);//blue
+            float rms=rmsOfBlockSamples[p]/scaleOfLoudnessPerPixel;
+            SDL_RenderDrawLine(renderer,p,centery,p,centery-(int)rms);
         }
         SDL_RenderPresent(renderer);
         SDL_Delay(160);
         if(running==false){
+            free(rmsOfBlockSamples);
             SDL_DestroyRenderer(renderer);
             SDL_DestroyWindow(window);
             SDL_Quit();
