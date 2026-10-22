@@ -26,7 +26,7 @@ void DFT_cropThoseSamples(const char *filename,uint32_t dataSize, uint32_t start
         return;
   }
 //   skip to start
-  if(fseek(fptr,start,SEEK_SET)!=0){
+  if(fseek(fptr,start+skipp,SEEK_SET)!=0){
     puts("seeking to starting point failed");
     fclose(fptr);
     return;
@@ -48,15 +48,17 @@ void DFT_findSpectrum_bruteForce(int16_t *inputs, int howmanySamples, float *coe
   // I saw that complex.h library can offer cexp(complex) and can do this also creal and cimag functions could do this 
   // in better but cosine and sine is more pleasant
   float normal=(float)1/howmanySamples;
+  const float PI=3.141592;
   for (int k=0;k<howmanySamples;k++){
       float xkReal=0.0;
       float xkImag=0.0;
       for(int n=0;n<howmanySamples;n++){
           int16_t xOfn=inputs[n];
-          float cosnk=cos(2*M_PI*n*k*normal);
-          float sinnk=sin(2*M_PI*n*k*normal);
+          int idx = (n*k) % howmanySamples;
+          float cosnk=cos(2*PI*idx/howmanySamples);
+          float sinnk=sin(2*PI*idx/howmanySamples);
           xkReal+=(xOfn*cosnk);
-          xkImag+=(xOfn*sinnk);
+          xkImag-=(xOfn*sinnk);
       }
       xkReal*=normal;
       xkImag*=normal;
@@ -68,9 +70,9 @@ void DFT_findSpectrum_bruteForce(int16_t *inputs, int howmanySamples, float *coe
 void  DFT_printSpectrum(float* coefficients, int howmanySamples){
    printf("spectrum:[");
    for(int j=0;j<howmanySamples;j++){
-    if(j==0){
+    if(j==0&& howmanySamples!=1){
       printf("%f",coefficients[j]);
-    }else if(j+1==howmanySamples){
+    }else if(j==howmanySamples-1){
       printf(",%f]\n",coefficients[j]);
     }else{
       printf(",%f",coefficients[j]);
@@ -80,11 +82,12 @@ void  DFT_printSpectrum(float* coefficients, int howmanySamples){
 
 void DFT_cosineFiller(int16_t *cosineSamples, int howmanySamples)
 {
-  int max=32000;
-  float stepp=0.01;
-  for(int i=0;i<howmanySamples;i++){
-    float value=(float)cos(i*stepp);
-    int16_t val=(int16_t)value*max;
-    cosineSamples[i]=val;
-  }
+   float stepp=(M_PI*2)/howmanySamples;
+   int max=32767;
+   for(int i=0;i<howmanySamples;i++){
+    float x=stepp*i;
+    float cosv=cos(x);
+    int16_t cosineSample=(int16_t)(cosv*max);
+    cosineSamples[i]=cosineSample;
+   }
 }
