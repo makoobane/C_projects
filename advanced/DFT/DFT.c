@@ -40,35 +40,34 @@ if(samplesRead==howmanySamples){
   fclose(fptr);
 }
 
-void DFT_findSpectrum_bruteForce(int16_t *inputs, int howmanySamples, float *coefficients)
+void DFT_findSpectrum(int16_t* inputs,int N,double* coefficients,double* freqs,uint32_t fs)
 {
-  // x[kr]=(1/howmanySamples)*sum(x[n].cos((2*pi*n*k)/howmanySamples)) --->real part or cosine part
-  // x[ki]=(1/howmanySamples)*sum(x[n].sin((2*pi*n*k)/howmanySamples)) -----> imaginery part or cosine part
-  // final x[k]=sqrt(x[kr]*x[kr]+x[ki]*x[ki])
-  // I saw that complex.h library can offer cexp(complex) and can do this also creal and cimag functions could do this 
-  // in better but cosine and sine is more pleasant
-  float normal=(float)1/howmanySamples;
-  const float PI=3.141592;
-  for (int k=0;k<howmanySamples;k++){
-      float xkReal=0.0;
-      float xkImag=0.0;
-      for(int n=0;n<howmanySamples;n++){
-          int16_t xOfn=inputs[n];
-          int idx = (n*k) % howmanySamples;
-          float cosnk=cos(2*PI*idx/howmanySamples);
-          float sinnk=sin(2*PI*idx/howmanySamples);
-          xkReal+=(xOfn*cosnk);
-          xkImag-=(xOfn*sinnk);
-      }
-      xkReal*=normal;
-      xkImag*=normal;
-      float xk=sqrtf(xkReal*xkReal+xkImag*xkImag);
-      coefficients[k]=xk;
-  }
+  double mean = 0;
+for (int i = 0; i < N; i++) mean += inputs[i];
+mean /= N;
+
+for (int k = 0; k <= N / 2; k++) {
+    double re = 0, im = 0;
+    for (int n = 0; n < N; n++) {
+        double w = 0.5 - 0.5 * cos(2 * M_PI * n / (N - 1));
+        double x = (inputs[n] - mean) * w;
+        double ang = 2 * M_PI * ((n * k) % N) / N;
+        re += x * cos(ang);
+        im -= x * sin(ang);
+    }
+    coefficients[k]=sqrt(re*re +im*im)/N;
+    double freq = (double)k * fs / N;
+    freqs[k]=freq;
+    
+}
 }
 
-void  DFT_printSpectrum(float* coefficients, int howmanySamples){
-   printf("spectrum:[");
+void  DFT_printSpectrum(double* coefficients, int howmanySamples,bool isFrequancy){
+   if(isFrequancy){
+    printf("frequancies:[");
+   }else{
+    printf("coefficients:[");
+   }
    for(int j=0;j<howmanySamples;j++){
     if(j==0&& howmanySamples!=1){
       printf("%f",coefficients[j]);
