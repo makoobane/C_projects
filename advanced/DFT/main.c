@@ -4,6 +4,7 @@
 #include <stdlib.h>
 #include "wav_reader.h"
 #include "DFT.h"
+#include "complex.h"
 
 int main(){
     WV_WavFileHeader* header=WV_readWavFileHeader("test.wav");
@@ -28,6 +29,23 @@ int main(){
     free(coefficients);
     
     WV_destroyWAVFileHeader(header);
+    // /// for testing complexx
+    // struct ComplexNumber* complex1=createComplexFromKN(3,4);
+    // struct ComplexNumber* complex2=createComplexFromKN(4,8);
+    // printComplex(complex1);
+    // printComplex(complex2);
+    // addTwoComplexes(complex1,complex2);
+    // printComplex(complex1);
+    // struct ComplexNumber* complex3=malloc(sizeof(struct ComplexNumber));
+    // complex3->real=-3;
+    // complex3->imaginery=-4.0;
+    // printComplex(complex3);
+    // printf("modulus of complex3 is:%lf\n",findModulus(complex3));
+    // scaleComplex(0.5,complex3);
+    // printComplex(complex3);
+    // free(complex3);
+    // free(complex1);
+    // free(complex2);
     return 0;
 }
 
