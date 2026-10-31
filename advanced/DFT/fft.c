@@ -1,53 +1,47 @@
-#include <stdlib.h>
 #include <stdio.h>
-struct Complex
-{
-    float real;
-    float imaginery;
-};
-void printArrayComplex(struct Complex* complex,size_t size);
-void find4Data_FFT(float* data,struct Complex* fft);
+#include <stdlib.h>
+#include <stdint.h>
+#include "complex.h"
 
+void FFT_twoDataPoints(size_t twin,int16_t* data,struct ComplexNumber* coefficients);
+void printCoefficients(struct ComplexNumber* coefficients,size_t size);
 int main(){
-    float* data=malloc(4*sizeof(float));
-    struct Complex* fft=malloc(4*sizeof(struct Complex));
+    size_t twin=2;
+    int16_t* data=calloc(twin,sizeof(int16_t));
+    struct ComplexNumber* coefficients=calloc(twin,sizeof(struct ComplexNumber));
     data[0]=10;
-    data[1]=11;
-    data[2]=12;
-    data[3]=13;
-    find4Data_FFT(data,fft);
-    
-    // cleaning
+    data[1]=20;
+    FFT_twoDataPoints(twin,data,coefficients);
+    printCoefficients(coefficients,twin);
+    // free
+    free(coefficients);
     free(data);
-    free(fft);
     return 0;
 }
 
-void printArrayComplex(struct Complex *complex, size_t size)
+void FFT_twoDataPoints(size_t twin, int16_t *data,struct  ComplexNumber *coefficients)
 {
-    printf("[");
-    for(size_t i=0;i<size; i++){
-        struct Complex current=complex[i];
-        if(current.imaginery!=0){
-            printf("%f %fi,",current.real,current.imaginery);
-        }else{
-            printf("%f,",current.real);
-        }
+    if(twin!=2){
+        puts("your data length is not two");
+        return;
     }
-    printf("]\n");
+    //no spliting 
+    /// just butterfly them 
+    struct ComplexNumber* complex=createComplexFromKN(0 , twin);
+    scaleComplex((double)data[1],complex);
+    addNumberToComplex(complex,data[0]);
+    coefficients[0]=complex[0];
+    free(complex);
+    struct ComplexNumber* complex2=createComplexFromKN(0 , twin);
+    scaleComplex((double)data[1],complex);
+    subtractComplexFromNumber(complex,data[0]);
+    coefficients[1]=complex[0];
+    free(complex);
 }
-// this function is just for 4 data points
-void find4Data_FFT(float *data, struct Complex *fft)
-{
-    size_t length=4;
-    int evenIndices[2]={0,2};
-    int oddIndices[2]={1,3};
-    for(size_t i=0;i<length/2;i++){
-       float evenAdd=(float)(data[evenIndices[0]]+data[evenIndices[1]]);
-       float evenSub=(float)(data[evenIndices[0]]- data[evenIndices[1]]);
-       float oddAdd=(float)(data[oddIndices[0]]+data[oddIndices[1]]);
-       float oddSub=(float)(data[oddIndices[0]]-data[oddIndices[1]]);
-       
 
+void printCoefficients(struct ComplexNumber *coefficients, size_t size)
+{
+    for(size_t s=0;s<size;s++){
+        printComplex(coefficients[s]);
     }
 }
