@@ -3,7 +3,7 @@
 #include <math.h>
 #include "complex.h"
 
-const double pi=3.141592654;
+const float pi=3.141592;
 struct ComplexNumber *createComplexFromKN(uint32_t k, uint32_t N)
 {
     struct ComplexNumber* complex=malloc(sizeof(struct ComplexNumber));
@@ -11,16 +11,28 @@ struct ComplexNumber *createComplexFromKN(uint32_t k, uint32_t N)
         puts("allocation of creation complex Number from K and N failed");
         return NULL;
     }
-    double real=cos((2*pi*k)/N);
-    double imaginery=sin((2*pi*k)/N)*(-1);
+    float real=cos((2*pi*k)/N);
+    float imaginery=sin((2*pi*k)/N)*(-1);
     complex->real=real;
     complex->imaginery=imaginery;
     return complex;
 }
 
+struct ComplexNumber *complexNumberFromInt16_t(int16_t data)
+{
+    struct ComplexNumber* complex=malloc(sizeof(struct ComplexNumber));
+    if(complex==NULL){
+        puts("failed allocatin complex at  from int16_t");
+        return NULL;
+    }
+    complex->real=(float)data;
+    complex->imaginery=0;
+    return complex;
+}
+
 void printComplex(struct ComplexNumber complex)
 {
-    if(complex.imaginery>0){
+    if(complex.imaginery>=0){
         printf("%lf+ %lfi\n",complex.real, complex.imaginery);
     }else{
         printf("%lf%lfi\n",complex.real,complex.imaginery);
@@ -65,24 +77,12 @@ struct ComplexNumber *multiply(struct ComplexNumber *c1,struct  ComplexNumber *c
 
 double findModulus(struct ComplexNumber *complex)
 {
-    return sqrt(complex->real* complex->real +complex->imaginery* complex->imaginery);
+    return sqrtf(complex->real* complex->real +complex->imaginery* complex->imaginery);
 }
 
-void scaleComplex(double scale,struct ComplexNumber *complex)
+void scaleComplex(float scale,struct ComplexNumber *complex)
 {
     complex->real*=scale;
     complex->imaginery*=scale;
 }
-/// @brief this function adds real number to complex. it is way to conceal two complexes where one of them is just real number
-/// @param complex the complex in for a+bi
-/// @param number real number but it will be treated like a+zero*i
-void addNumberToComplex(struct ComplexNumber *complex, int16_t number)
-{
-    complex.real+=(double)number;
-}
-/// @brief this function does real Number - complex number 
 
-void subtractComplexFromNumber(struct ComplexNumber *complex, int16_t number)
-{
-    complex.real= (double)number - complex->real;
-}
