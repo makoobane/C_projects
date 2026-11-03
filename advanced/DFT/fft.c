@@ -4,14 +4,19 @@
 #include "complex.h"
 void FFT_printCoefficients(struct ComplexNumber* coefficients,size_t size);
 struct ComplexNumber* FFT_forTwoDataPoints(int16_t* data);
-void FFT_forFourDataPoints(int16_t* data, struct ComplexNumber* coefficients);
+struct ComplexNumber* FFT_forFourDataPoints(int16_t* data);
 int main(){
-    size_t two=2;
-    int16_t* data=calloc(two,sizeof(int16_t));
+    // size_t two=2;
+    size_t four=4;
+    int16_t* data=calloc(four,sizeof(int16_t));
     data[0]=10;
     data[1]=13;
-    struct ComplexNumber* coefficients= FFT_forTwoDataPoints(data);
-    FFT_printCoefficients(coefficients,two);
+    data[2]=9;
+    data[3]=3;
+    // struct ComplexNumber* coefficients= FFT_forTwoDataPoints(data);
+    // FFT_printCoefficients(coefficients,two);
+    struct ComplexNumber* coefficients=FFT_forFourDataPoints(data);
+    FFT_printCoefficients(coefficients,four);
     // freeing
     free(data);
     free(coefficients);
@@ -26,41 +31,59 @@ void FFT_printCoefficients(struct ComplexNumber *coefficients,size_t size)
 }
 struct ComplexNumber* FFT_forTwoDataPoints(int16_t* data)
 {
-    // no spliting since it is just two
-    //this is smallest butterfly
-  struct ComplexNumber* coefficients=calloc(2,sizeof(struct ComplexNumber));
-  if(coefficients==NULL){
-    puts("it failed FFT_forTwoDataponts coeff allocation");
-    return NULL;
-  }
-  struct ComplexNumber* data0=complexNumberFromInt16_t(data[0]);
-  struct ComplexNumber* data1=complexNumberFromInt16_t(data[1]);
-  struct ComplexNumber* coef1=addTwoComplexes(data0,data1);
-  struct ComplexNumber* coef2=subtractComplexes(data0,data1);
-  coefficients[0].real=coef1->real;
-  coefficients[0].imaginery=coef1->imaginery;
-  coefficients[1].real=coef2->real;
-  coefficients[1].imaginery=coef2->imaginery;
-   //   destroy
-   free(data0);
-   free(data1);
-   free(coef1);
-   free(coef2);
-  return coefficients;
+    struct ComplexNumber* coefficients=calloc(2,sizeof(struct ComplexNumber));
+    if(coefficients==NULL){
+        puts("coefficients failed in two datapoints calculation");
+        return NULL;
+    }
+    float coef1=(float)(data[0]+data[1]);
+    float coef2=(float)(data[0]-data[1]);
+    coefficients[0].real=coef1;
+    coefficients[0].imaginery=0.0;
+    coefficients[1].real=coef2;
+    coefficients[1].imaginery=0.0;
+    return coefficients;
+
 }
 
-void FFT_forFourDataPoints(int16_t *data,struct ComplexNumber *coefficients)
+struct ComplexNumber *FFT_forFourDataPoints(int16_t *data)
 {
-    // split it to even and odd 
-    //can we skip the spliting and doing things from head ... lets do that instead of making two arrays
-    int k=4/2;
-    struct ComplexNumber* twiddles=calloc(k,sizeof(struct ComplexNumber));
-    for(int j=0;j<k;j++){
-        struct ComplexNumber* twiddlComplex=createComplexFromKN(j,4);
-        twiddles[j].real=twiddlComplex->real;
-        twiddles[j].imaginery=twiddlComplex->imaginery;
-        free(twiddlComplex);
+    struct ComplexNumber* coefficients=calloc(4,sizeof(struct ComplexNumber));
+    if(coefficients==NULL){
+        puts("it failed to allocate four data points coefficients");
+        return NULL;
     }
-    
+    //do twiddle of twos
+    float coef1=(float)(data[0]+data[2]);
+    float coef2=(float)(data[0]-data[2]);
+    float coef3=(float)(data[1]+data[3]);
+    float coef4=(float)(data[1]-data[3]);
+    coefficients[0].real=coef1;
+    coefficients[0].imaginery=0.0;
+    coefficients[1].real=coef2;
+    coefficients[1].imaginery=0.0;
+    coefficients[2].real=coef3;
+    coefficients[2].imaginery=0.0;
+    coefficients[3].real=coef4;
+    coefficients[3].imaginery=0.0;
+    //do twiddle of four
+    struct ComplexNumber* twiddle0=createComplexFromKN(0,4);
+    struct ComplexNumber* twiddle1=createComplexFromKN(1,4);
+    //calculate twidlle multiples
+    struct ComplexNumber* coef3WithTwiddle0=multiply(&coefficients[2],twiddle0);
+    struct ComplexNumber* coef4WithTwiddle1=multiply(&coefficients[3],twiddle1);
+    free(twiddle0);
+    free(twiddle1);
+    coefficients[0].real+=coef3WithTwiddle0->real;
+    coefficients[0].imaginery+=coef3WithTwiddle0->imaginery;
+    coefficients[1].real-=coef3WithTwiddle0->real;
+    coefficients[1].imaginery-=coef3WithTwiddle0->imaginery;
+    coefficients[2].real+=coef4WithTwiddle1->real;
+    coefficients[2].imaginery+=coef4WithTwiddle1->imaginery;
+    coefficients[3].real-=coef4WithTwiddle1->real;
+    coefficients[3].imaginery-=coef4WithTwiddle1->imaginery;
 
+    free(coef3WithTwiddle0);
+    free(coef4WithTwiddle1);    
+    return coefficients;
 }

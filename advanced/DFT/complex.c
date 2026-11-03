@@ -18,17 +18,6 @@ struct ComplexNumber *createComplexFromKN(uint32_t k, uint32_t N)
     return complex;
 }
 
-struct ComplexNumber *complexNumberFromInt16_t(int16_t data)
-{
-    struct ComplexNumber* complex=malloc(sizeof(struct ComplexNumber));
-    if(complex==NULL){
-        puts("failed allocatin complex at  from int16_t");
-        return NULL;
-    }
-    complex->real=(float)data;
-    complex->imaginery=0;
-    return complex;
-}
 
 void printComplex(struct ComplexNumber complex)
 {
