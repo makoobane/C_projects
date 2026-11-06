@@ -5,19 +5,30 @@
 #include "complex.h"
 void FFT_printCoefficients(struct ComplexNumber* coefficients,size_t size);
 struct ComplexNumber* FFT_2(int16_t* data);
+void FFT_spliting(struct ComplexNumber* coefficients, size_t size);
 struct ComplexNumber* FFT_4(int16_t* data,size_t size);
 int main(){
-    // size_t two=2;
-    size_t four=4;
-    int16_t* data=calloc(four,sizeof(int16_t));
-    data[0]=10;
-    data[1]=11;
-    data[2]=12;
-    data[3]=13;
-    // struct ComplexNumber* coefficients= FFT_2(data);
-    // FFT_printCoefficients(coefficients,two);
-    struct ComplexNumber* coefficients=FFT_4(data,four);
-    FFT_printCoefficients(coefficients,four);
+    size_t size=8;
+    int16_t* data=calloc(size,sizeof(int16_t));
+    data[0]=0;
+    data[1]=1;
+    data[2]=2;
+    data[3]=3;
+    data[4]=4;
+    data[5]=5;
+    data[6]=6;
+    data[7]=7;
+    struct ComplexNumber* coefficients=calloc(size,sizeof(struct ComplexNumber));
+    if(coefficients==NULL){
+        puts("it failed to allocate four data points coefficients");
+    }
+    // put data in coefficients as complex
+    for(size_t s=0;s<size;s++){
+        coefficients[s].real=(float)data[s];
+        coefficients[s].imaginery=0.0;
+    }
+    FFT_spliting(coefficients,size);
+    FFT_printCoefficients(coefficients,size);
     // freeing
     free(data);
     free(coefficients);
@@ -48,19 +59,39 @@ struct ComplexNumber* FFT_2(int16_t* data)
     return coefficients;
 
 }
+void FFT_spliting(struct ComplexNumber *coefficients, size_t size)
+{
+    struct ComplexNumber* spareCoefficients=calloc(size,sizeof(struct  ComplexNumber));
+    if(spareCoefficients==NULL){
+        puts("spare allocation failed in splitting");
+        return ;
+    }
+    //splits 
+    size_t howmanySplits=size/4;
+    for(size_t split=1;split<howmanySplits+1;split++){
+        //unload those changes to real coeficients
+        for(size_t j=0;j<size;j++){
+            coefficients[j].real=spareCoefficients[j].real;
+            coefficients[j].imaginery=spareCoefficients[j].imaginery;
+        }
+    }
+   
+    free(spareCoefficients);
+}
 /// @brief  this function is trying to do FFT of four data points at this time
 struct ComplexNumber *FFT_4(int16_t *data,size_t size)
 {
-    struct ComplexNumber* coefficients=calloc(4,sizeof(struct ComplexNumber));
+    struct ComplexNumber* coefficients=calloc(size,sizeof(struct ComplexNumber));
     if(coefficients==NULL){
         puts("it failed to allocate four data points coefficients");
         return NULL;
     }
     // put data in coefficients as complex
-    for(size_t s=0;s<4;s++){
+    for(size_t s=0;s<size;s++){
         coefficients[s].real=(float)data[s];
-        //calloc will ffill zeros in imaginary
+        coefficients[s].imaginery=0.0;
     }
+
     float howmanyTwiddles=log2f(size);
     size_t nyquest=size/2;
     printf("how many twiddles i need:%f\n",howmanyTwiddles);
@@ -76,7 +107,7 @@ struct ComplexNumber *FFT_4(int16_t *data,size_t size)
             struct ComplexNumber* secondComplexWithTwiddle=multiply(&secondComplex,twiddle);
             struct ComplexNumber* addition=addTwoComplexes(&firstComplex,secondComplexWithTwiddle);
             struct ComplexNumber* subtraction=subtractComplexes(&firstComplex,secondComplexWithTwiddle);
-            coefficients[k].real=addition.real;
+            coefficients[k].real=addition->real;
             coefficients[k].imaginery=addition->imaginery;
             
             free(twiddle);
