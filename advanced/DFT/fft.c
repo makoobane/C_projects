@@ -8,21 +8,12 @@ struct ComplexNumber* FFT_2(int16_t* data);
 void FFT_spliting(struct ComplexNumber* coefficients, int size);
 struct ComplexNumber* FFT_(int16_t* data,int size);
 int main(){
-    size_t size=16;
+    int size=16;
     int16_t* data=calloc(size,sizeof(int16_t));
     for(size_t i=0;i<size;i++){
         data[i]=(int16_t)i;
     }
-    struct ComplexNumber* coefficients=calloc(size,sizeof(struct ComplexNumber));
-    if(coefficients==NULL){
-        puts("it failed to allocate four data points coefficients");
-    }
-    // put data in coefficients as complex
-    for(size_t s=0;s<size;s++){
-        coefficients[s].real=(float)data[s];
-        coefficients[s].imaginery=0.0;
-    }
-    FFT_spliting(coefficients,size);
+    struct ComplexNumber* coefficients=FFT_(data,size);
     FFT_printCoefficients(coefficients,size);
     // freeing
     free(data);
@@ -62,7 +53,6 @@ void FFT_spliting(struct ComplexNumber *coefficients, int size)
         return ;
     }
     int bits=(int)log2f(size);
-    printf("bit size is %d\n",bits);
     int reversed_index=0;
     for(int index=0;index<size;index++){
         int currentIndex=index;
@@ -107,7 +97,22 @@ struct ComplexNumber *FFT_(int16_t *data,int size)
         //twiddle 2 then 4 then 8 then .... till it reaches size of data
         int howManyChunks=size/b;//it is like when b==2 size/2 is half which is how many pairs i need to butterfly them
         for(int chunk=0;chunk<howManyChunks;chunk++){
-           
+           for(int i=0;i<b/2;i++){
+            struct ComplexNumber* twiddle=createComplexFromKN(i,b);
+            struct ComplexNumber first=coefficients[i+chunk*b];
+            struct ComplexNumber _=coefficients[i+b/2+chunk*b];
+            struct ComplexNumber* second=multiply(&_,twiddle);
+            struct ComplexNumber* addition=addTwoComplexes(&first,second);
+            struct ComplexNumber* subtraction=subtractComplexes(&first,second);
+            coefficients[i+chunk*b].real=addition->real;
+            coefficients[i+chunk*b].imaginery=addition->imaginery;
+            coefficients[i+b/2+chunk*b].real=subtraction->real;
+            coefficients[i+b/2+chunk*b].imaginery=subtraction->imaginery;
+            free(addition);
+            free(subtraction);
+            free(second);
+            free(twiddle);
+           }
         }
     }
     return coefficients;
