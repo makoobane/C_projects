@@ -5,19 +5,14 @@
 #include "complex.h"
 void FFT_printCoefficients(struct ComplexNumber* coefficients,size_t size);
 struct ComplexNumber* FFT_2(int16_t* data);
-void FFT_spliting(struct ComplexNumber* coefficients, size_t size);
+void FFT_spliting(struct ComplexNumber* coefficients, int size);
 struct ComplexNumber* FFT_4(int16_t* data,size_t size);
 int main(){
-    size_t size=8;
+    size_t size=16;
     int16_t* data=calloc(size,sizeof(int16_t));
-    data[0]=0;
-    data[1]=1;
-    data[2]=2;
-    data[3]=3;
-    data[4]=4;
-    data[5]=5;
-    data[6]=6;
-    data[7]=7;
+    for(size_t i=0;i<size;i++){
+        data[i]=(int16_t)i;
+    }
     struct ComplexNumber* coefficients=calloc(size,sizeof(struct ComplexNumber));
     if(coefficients==NULL){
         puts("it failed to allocate four data points coefficients");
@@ -59,23 +54,37 @@ struct ComplexNumber* FFT_2(int16_t* data)
     return coefficients;
 
 }
-void FFT_spliting(struct ComplexNumber *coefficients, size_t size)
+void FFT_spliting(struct ComplexNumber *coefficients, int size)
 {
     struct ComplexNumber* spareCoefficients=calloc(size,sizeof(struct  ComplexNumber));
     if(spareCoefficients==NULL){
         puts("spare allocation failed in splitting");
         return ;
     }
-    //splits 
-    size_t howmanySplits=size/4;
-    for(size_t split=1;split<howmanySplits+1;split++){
-        //unload those changes to real coeficients
-        for(size_t j=0;j<size;j++){
-            coefficients[j].real=spareCoefficients[j].real;
-            coefficients[j].imaginery=spareCoefficients[j].imaginery;
+    int bits=(int)log2f(size);
+    printf("bit size is %d\n",bits);
+    int reversed_index=0;
+    for(int index=0;index<size;index++){
+        int currentIndex=index;
+        for(int b=0;b<bits;b++){
+            //shift to left to make space for new binary
+            reversed_index<<=1;
+            //cut last binary in index and put it on reversal
+            reversed_index |= (currentIndex & 1);
+            //remove that last binary from index
+            currentIndex >>= 1;
         }
+        //now we have reversed index
+        spareCoefficients[reversed_index].real=coefficients[index].real;
+        spareCoefficients[reversed_index].imaginery=coefficients[index].imaginery;
+        //reset reversed_index
+        reversed_index=0;
+    }    
+    //unload those changes to real coeficients
+    for(int j=0;j<size;j++){
+        coefficients[j].real=spareCoefficients[j].real;
+        coefficients[j].imaginery=spareCoefficients[j].imaginery;
     }
-   
     free(spareCoefficients);
 }
 /// @brief  this function is trying to do FFT of four data points at this time
