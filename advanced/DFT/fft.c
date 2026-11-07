@@ -6,7 +6,7 @@
 void FFT_printCoefficients(struct ComplexNumber* coefficients,size_t size);
 struct ComplexNumber* FFT_2(int16_t* data);
 void FFT_spliting(struct ComplexNumber* coefficients, int size);
-struct ComplexNumber* FFT_4(int16_t* data,size_t size);
+struct ComplexNumber* FFT_(int16_t* data,int size);
 int main(){
     size_t size=16;
     int16_t* data=calloc(size,sizeof(int16_t));
@@ -87,8 +87,8 @@ void FFT_spliting(struct ComplexNumber *coefficients, int size)
     }
     free(spareCoefficients);
 }
-/// @brief  this function is trying to do FFT of four data points at this time
-struct ComplexNumber *FFT_4(int16_t *data,size_t size)
+/// @brief  this function is trying to do FFT 
+struct ComplexNumber *FFT_(int16_t *data,int size)
 {
     struct ComplexNumber* coefficients=calloc(size,sizeof(struct ComplexNumber));
     if(coefficients==NULL){
@@ -100,30 +100,14 @@ struct ComplexNumber *FFT_4(int16_t *data,size_t size)
         coefficients[s].real=(float)data[s];
         coefficients[s].imaginery=0.0;
     }
-
-    float howmanyTwiddles=log2f(size);
-    size_t nyquest=size/2;
-    printf("how many twiddles i need:%f\n",howmanyTwiddles);
-    for(int t=0;t<(int)howmanyTwiddles;t++){
-        // first twiddle is 2 data points connection, second twiddle is for four data points connection...
-        uint32_t N=(uint32_t)pow(2,t+1);
-        for(size_t k=0;k<nyquest;k++){
-            //this spliting of four data points 
-            struct ComplexNumber firstComplex=coefficients[k];
-            struct ComplexNumber secondComplex=coefficients[k+nyquest];
-            uint32_t K=t*k;
-            struct ComplexNumber* twiddle=createComplexFromKN(K,N);
-            struct ComplexNumber* secondComplexWithTwiddle=multiply(&secondComplex,twiddle);
-            struct ComplexNumber* addition=addTwoComplexes(&firstComplex,secondComplexWithTwiddle);
-            struct ComplexNumber* subtraction=subtractComplexes(&firstComplex,secondComplexWithTwiddle);
-            coefficients[k].real=addition->real;
-            coefficients[k].imaginery=addition->imaginery;
-            
-            free(twiddle);
-            free(secondComplexWithTwiddle);
-            free(addition);
-            free(subtraction);
-
+    //spliting and ordering
+    FFT_spliting(coefficients,size);
+    //do butterflying
+    for(int b=2;b<=size;b*=2){
+        //twiddle 2 then 4 then 8 then .... till it reaches size of data
+        int howManyChunks=size/b;//it is like when b==2 size/2 is half which is how many pairs i need to butterfly them
+        for(int chunk=0;chunk<howManyChunks;chunk++){
+           
         }
     }
     return coefficients;
