@@ -6,6 +6,7 @@
 void FFT_printCoefficients(struct ComplexNumber* coefficients,size_t size);
 struct ComplexNumber* FFT_2(int16_t* data);
 void FFT_spliting(struct ComplexNumber* coefficients, int size);
+void FFT_normalize(struct ComplexNumber *coefficients, int size);
 struct ComplexNumber* FFT_(int16_t* data,int size);
 int main(){
     int size=16;
@@ -14,6 +15,7 @@ int main(){
         data[i]=(int16_t)i;
     }
     struct ComplexNumber* coefficients=FFT_(data,size);
+    FFT_normalize(coefficients,size);
     FFT_printCoefficients(coefficients,size);
     // freeing
     free(data);
@@ -93,27 +95,48 @@ struct ComplexNumber *FFT_(int16_t *data,int size)
     //spliting and ordering
     FFT_spliting(coefficients,size);
     //do butterflying
+    struct ComplexNumber* second=malloc(sizeof(struct ComplexNumber));
+    struct ComplexNumber* addition=malloc(sizeof(struct ComplexNumber));
+    struct ComplexNumber* subtraction=malloc(sizeof(struct ComplexNumber));
+    if(second==NULL|| addition==NULL||subtraction==NULL){
+        puts("error ocuured on allocatting tools for fft");
+        return coefficients;
+    }
     for(int b=2;b<=size;b*=2){
         //twiddle 2 then 4 then 8 then .... till it reaches size of data
         int howManyChunks=size/b;//it is like when b==2 size/2 is half which is how many pairs i need to butterfly them
         for(int chunk=0;chunk<howManyChunks;chunk++){
-           for(int i=0;i<b/2;i++){
-            struct ComplexNumber* twiddle=createComplexFromKN(i,b);
-            struct ComplexNumber first=coefficients[i+chunk*b];
-            struct ComplexNumber _=coefficients[i+b/2+chunk*b];
-            struct ComplexNumber* second=multiply(&_,twiddle);
-            struct ComplexNumber* addition=addTwoComplexes(&first,second);
-            struct ComplexNumber* subtraction=subtractComplexes(&first,second);
-            coefficients[i+chunk*b].real=addition->real;
-            coefficients[i+chunk*b].imaginery=addition->imaginery;
-            coefficients[i+b/2+chunk*b].real=subtraction->real;
-            coefficients[i+b/2+chunk*b].imaginery=subtraction->imaginery;
-            free(addition);
-            free(subtraction);
-            free(second);
-            free(twiddle);
-           }
+            for(int i=0;i<b/2;i++){
+               struct ComplexNumber twiddle=createComplexFromKN(i,b);
+               struct ComplexNumber first=coefficients[i+chunk*b];
+               struct ComplexNumber _=coefficients[i+b/2+chunk*b];
+               multiply(&_,&twiddle,second);
+               addTwoComplexes(&first,second,addition);
+               subtractComplexes(&first,second,subtraction);
+               coefficients[i+chunk*b].real=addition->real;
+               coefficients[i+chunk*b].imaginery=addition->imaginery;
+               coefficients[i+b/2+chunk*b].real=subtraction->real;
+               coefficients[i+b/2+chunk*b].imaginery=subtraction->imaginery;
+               //empty second, addition and subtraction
+               second->real=0.0;
+               second->imaginery=0.0;
+               addition->real=0.0;
+               addition->imaginery=0.0;
+               subtraction->real=0.0;
+               subtraction->imaginery=0.0;
         }
     }
+}
+    free(addition);
+    free(subtraction);
+    free(second);
     return coefficients;
+}
+void FFT_normalize(struct ComplexNumber *coefficients, int size)
+{
+    float scale = 1.0f / (float)size;
+    for (int k = 0; k < size; k++) {
+        coefficients[k].real      *= scale;
+        coefficients[k].imaginery *= scale;
+    }
 }
