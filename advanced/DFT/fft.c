@@ -67,19 +67,20 @@ int main(){
     int16_t* bucket=calloc(howmanySamples,sizeof(int16_t));
     uint32_t start=88244;
     DFT_cropThoseSamples("test.wav",header->subchunk2Size,start,start+howmanySamples*sizeof(int16_t),bucket,howmanySamples);
-
+    
     struct ComplexNumber *coefficients = FFT_(bucket, howmanySamples);
     if (!coefficients) { free(bucket); return 1; }
-
+    
     FFT_normalize(coefficients, howmanySamples);
-
+    
     Peak top[10];
     top10Peaks(coefficients, howmanySamples, fs, top);
-
+    
     puts("top ten frequencies:");
     for (int m = 0; m < 10; m++)
-        printf("freq %d: %lf Hz at bin %d\n", m, top[m].freq, top[m].bin);
-
+    printf("freq %d: %lf Hz at bin %d\n", m, top[m].freq, top[m].bin);
+    // freeing 
+    free(header);
     free(bucket);
     free(coefficients);
     return 0;
