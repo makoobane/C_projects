@@ -5,37 +5,86 @@
 #include "wav_reader.h"
 #include "DFT.h"
 #include "complex.h"
+
+typedef struct { double freq; int bin; } Peak;
+
+static void top10Peaks(const struct ComplexNumber *c, int size, double fs, Peak out[10])
+{
+    int half = size / 2;
+    double *mag = malloc(half * sizeof *mag);
+    if (!mag) { puts("magnitude allocation failed"); return; }
+
+    for (int i = 0; i < half; i++)
+        mag[i] = (double)c[i].real * c[i].real + (double)c[i].imaginery * c[i].imaginery;
+
+    double bestMag[10];
+    int    bestBin[10];
+    for (int j = 0; j < 10; j++) { bestMag[j] = -1.0; bestBin[j] = -1; }
+
+    /* skip DC (bin 0); only keep local maxima so one tone is not listed many times */
+    for (int i = 1; i < half - 1; i++) {
+        if (!(mag[i] > mag[i - 1] && mag[i] >= mag[i + 1])) continue;
+
+        int j = 0;
+        while (j < 10 && bestMag[j] >= mag[i]) j++;
+        if (j == 10) continue;
+
+        for (int r = 9; r > j; r--) {
+            bestMag[r] = bestMag[r - 1];
+            bestBin[r] = bestBin[r - 1];
+        }
+        bestMag[j] = mag[i];
+        bestBin[j] = i;
+    }
+
+    for (int j = 0; j < 10; j++) {
+        out[j].bin  = bestBin[j];
+        out[j].freq = (bestBin[j] >= 0) ? bestBin[j] * fs / size : 0.0;
+    }
+    free(mag);
+}
 void FFT_printCoefficients(struct ComplexNumber* coefficients,size_t size);
 struct ComplexNumber* FFT_2(int16_t* data);
 void FFT_spliting(struct ComplexNumber* coefficients, int size);
 void FFT_normalize(struct ComplexNumber *coefficients, int size);
 struct ComplexNumber* FFT_(int16_t* data,int size);
-double* top10Freqs(struct ComplexNumber* coefficients, int size);
+int16_t *generateSine(double freq, double fs, int size);
 int main(){
+    // TESTING--------------------------------------------------------------
+    // const int    N  = 4096;
+    // const double fs = 44100.0;
+
+    // /* choose a frequency that lands exactly on bin 64: 64 * fs / N = 689.0625 Hz */
+    // int16_t *bucket = generateSine(689.0625, fs, N);
+    // if (!bucket) return 1;
+    // ACTUAL-------------------------------------------------------
+    double fs=44100.0;
     WV_WavFileHeader* header=WV_readWavFileHeader("test.wav");
     WV_printWavHeader(header);
     // WV_printData("test.wav",header->subchunk2Size);
     // WV_ViewWavFileDataMinAndMax("test.wav");
     int howmanySamples=131072;
     int16_t* bucket=calloc(howmanySamples,sizeof(int16_t));
-    uint32_t start=10000;
+    uint32_t start=88244;
     DFT_cropThoseSamples("test.wav",header->subchunk2Size,start,start+howmanySamples*sizeof(int16_t),bucket,howmanySamples);
-    // bruteforcing DFT and printing
-    struct ComplexNumber* coefficients=FFT_(bucket,howmanySamples);
-    FFT_normalize(coefficients,howmanySamples);
-    
-    FFT_printCoefficients(coefficients,howmanySamples);
-    double* topTen= top10Freqs(coefficients,howmanySamples);
-    puts("top ten frequancies are:------------");
-    for(int  m=0;m<10;m++){
-        printf("freq %d:%lfHz at bin %lf\n",m,topTen[m],(topTen[m]*howmanySamples/2)/44100.0);
-    }
-    // freeing
-    free(topTen);
+
+    struct ComplexNumber *coefficients = FFT_(bucket, howmanySamples);
+    if (!coefficients) { free(bucket); return 1; }
+
+    FFT_normalize(coefficients, howmanySamples);
+
+    Peak top[10];
+    top10Peaks(coefficients, howmanySamples, fs, top);
+
+    puts("top ten frequencies:");
+    for (int m = 0; m < 10; m++)
+        printf("freq %d: %lf Hz at bin %d\n", m, top[m].freq, top[m].bin);
+
     free(bucket);
     free(coefficients);
     return 0;
 }
+
 
 void FFT_printCoefficients(struct ComplexNumber *coefficients,size_t size)
 {
@@ -96,7 +145,7 @@ void FFT_spliting(struct ComplexNumber *coefficients, int size)
 /// @brief  this function is trying to do FFT 
 struct ComplexNumber *FFT_(int16_t *data,int size)
 {
-
+  
     if(size<=0|| (size & (size-1))!=0){
         puts("it is not 2 power n");
         return NULL;
@@ -155,44 +204,16 @@ struct ComplexNumber *FFT_(int16_t *data,int size)
     free(second);
     return coefficients;
 }
-double *top10Freqs(struct ComplexNumber *coefficients, int size)
+/// @brief this function will create sine waves to test fft
+int16_t *generateSine(double freq, double fs, int size)
 {
-    double* toptenFreq=calloc(10,sizeof(double));
-    int* top10indexes=calloc(10,sizeof(int));
-    if(top10indexes==NULL){
-        puts("indexes container failed");
-        return NULL;
+    int16_t *data = malloc(size * sizeof *data);
+    if (!data) { puts("failed to allocate generated data"); return NULL; }
+    for (int i = 0; i < size; i++) {
+        double v = sin(2.0 * M_PI * freq * i / fs);
+        data[i] = (int16_t)lround(v * 32767.0);
     }
-    if(top10Freqs==NULL){
-        puts("it failed to make the bucket of top 10 freq");
-        return NULL;
-    }
-   
-    for(int i=0;i<size/2;i++){
-        double maginitude=coefficients[i].real* coefficients[i].real +coefficients[i].imaginery*coefficients[i].imaginery;
-        for(int j=0;j<10;j++){
-          int index=top10indexes[j];
-        //   use  magnitude in ffreq positions for temperory
-          double magint=  toptenFreq[j];
-          if(magint<maginitude){
-            // move things from that position to next "propagate them"
-           for(int r=index;r<9;r++){
-              top10indexes[r+1]=top10indexes[r];
-              toptenFreq[r+1]=toptenFreq[r];
-           }
-           //    then replace the current one
-           top10indexes[j]=i;
-           toptenFreq[j]=maginitude;
-           break;
-          }
-        }
-    }
-    // convert top 10 indexes to frequancies 
-    for(int i=0;i<10;i++){
-        toptenFreq[i]=(double)(top10indexes[i]*44100.0/size);
-    }
-    free(top10indexes);
-    return toptenFreq;
+    return data;
 }
 void FFT_normalize(struct ComplexNumber *coefficients, int size)
 {
